@@ -1,5 +1,3 @@
-"use strict";
-
 const color = require("kleur");
 const Prompt = require("./prompt");
 const { style, clear, figures, wrap, entriesToDisplay } = require("../util");

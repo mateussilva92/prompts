@@ -1,5 +1,3 @@
-"use strict";
-
 const main = {
   arrowUp: "↑",
   arrowDown: "↓",

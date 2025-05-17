@@ -1,5 +1,3 @@
-"use strict";
-
 class DatePart {
   constructor({ token, date, parts, locales }) {
     this.token = token;
@@ -8,12 +6,18 @@ class DatePart {
     this.locales = locales || {};
   }
 
+  up() {}
+
+  down() {}
+
   next() {
     const currentIdx = this.parts.indexOf(this);
     return this.parts.find(
       (part, idx) => idx > currentIdx && part instanceof DatePart
     );
   }
+
+  setTo(val) {}
 
   prev() {
     let parts = [].concat(this.parts).reverse();

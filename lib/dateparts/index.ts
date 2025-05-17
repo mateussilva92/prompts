@@ -1,5 +1,3 @@
-"use strict";
-
 module.exports = {
   DatePart: require("./datepart"),
   Meridiem: require("./meridiem"),

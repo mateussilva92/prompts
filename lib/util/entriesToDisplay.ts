@@ -1,5 +1,3 @@
-"use strict";
-
 /**
  * Determine what entries should be displayed on the screen, based on the
  * currently selected index and the maximum visible. Used in list-based

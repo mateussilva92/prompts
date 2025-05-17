@@ -1,5 +1,3 @@
-"use strict";
-
 const prompts = require("./prompts");
 
 const passOn = ["suggest", "format", "onState", "validate", "onRender", "type"];

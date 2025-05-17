@@ -1,5 +1,3 @@
-"use strict";
-
 module.exports = (key, isSelect) => {
   if (key.meta && key.name !== "escape") return;
 

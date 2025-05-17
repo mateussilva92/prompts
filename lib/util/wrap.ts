@@ -1,5 +1,3 @@
-"use strict";
-
 /**
  * @param {string} msg The message to wrap
  * @param {object} opts

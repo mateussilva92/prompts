@@ -1,5 +1,3 @@
-"use strict";
-
 const readline = require("readline");
 const { action } = require("../util");
 const EventEmitter = require("events");

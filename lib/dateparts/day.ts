@@ -1,5 +1,3 @@
-"use strict";
-
 const DatePart = require("./datepart");
 
 const pos = (n) => {

@@ -1,5 +1,3 @@
-"use strict";
-
 const strip = require("./strip");
 const { erase, cursor } = require("sisteransi");
 

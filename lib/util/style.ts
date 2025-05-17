@@ -1,5 +1,3 @@
-"use strict";
-
 const c = require("kleur");
 const figures = require("./figures");
 
