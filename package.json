@@ -37,7 +37,8 @@
   ],
   "dependencies": {
     "kleur": "^4.0.1",
-    "sisteransi": "^1.0.5"
+    "sisteransi": "^1.0.5",
+    "strip-ansi": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.17",
