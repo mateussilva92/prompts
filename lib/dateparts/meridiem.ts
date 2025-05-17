@@ -1,6 +1,6 @@
-const DatePart = require("./datepart");
+import { DatePart } from "./datepart";
 
-class Meridiem extends DatePart {
+export class Meridiem extends DatePart {
   constructor(opts = {}) {
     super(opts);
   }
@@ -13,10 +13,8 @@ class Meridiem extends DatePart {
     this.up();
   }
 
-  toString() {
-    let meridiem = this.date.getHours() > 12 ? "pm" : "am";
-    return /\A/.test(this.token) ? meridiem.toUpperCase() : meridiem;
+  toString(): string {
+    const meridiem = this.date.getHours() >= 12 ? "pm" : "am";
+    return this.token.startsWith("A") ? meridiem.toUpperCase() : meridiem;
   }
 }
-
-module.exports = Meridiem;

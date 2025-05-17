@@ -1,6 +1,6 @@
-const DatePart = require("./datepart");
+import { DatePart } from "./datepart";
 
-class Minutes extends DatePart {
+export class Minutes extends DatePart {
   constructor(opts = {}) {
     super(opts);
   }
@@ -13,14 +13,17 @@ class Minutes extends DatePart {
     this.date.setMinutes(this.date.getMinutes() - 1);
   }
 
-  setTo(val) {
-    this.date.setMinutes(parseInt(val.substr(-2)));
+  setTo(val: string) {
+    const minutes = parseInt(val.slice(-2));
+    if (!isNaN(minutes)) {
+      this.date.setMinutes(minutes);
+    }
   }
 
-  toString() {
-    let m = this.date.getMinutes();
-    return this.token.length > 1 ? String(m).padStart(2, "0") : m;
+  toString(): string {
+    const minutes = this.date.getMinutes();
+    return this.token.length > 1
+      ? String(minutes).padStart(2, "0")
+      : String(minutes);
   }
 }
-
-module.exports = Minutes;

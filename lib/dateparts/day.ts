@@ -1,11 +1,26 @@
-const DatePart = require("./datepart");
+import { DatePart } from "./datepart";
 
-const pos = (n) => {
-  n = n % 10;
-  return n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th";
+const getOrdinalSuffix = (n: number): string => {
+  const rem10 = n % 10;
+  const rem100 = n % 100;
+
+  if (rem100 >= 11 && rem100 <= 13) {
+    return "th";
+  }
+
+  switch (rem10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
 };
 
-class Day extends DatePart {
+export class Day extends DatePart {
   constructor(opts = {}) {
     super(opts);
   }
@@ -18,25 +33,30 @@ class Day extends DatePart {
     this.date.setDate(this.date.getDate() - 1);
   }
 
-  setTo(val) {
-    this.date.setDate(parseInt(val.substr(-2)));
+  setTo(val: string) {
+    const day = parseInt(val.slice(-2));
+    if (!isNaN(day)) {
+      this.date.setDate(day);
+    }
   }
 
   toString() {
-    let date = this.date.getDate();
-    let day = this.date.getDay();
-    return this.token === "DD"
-      ? String(date).padStart(2, "0")
-      : this.token === "Do"
-      ? date + pos(date)
-      : this.token === "d"
-      ? day + 1
-      : this.token === "ddd"
-      ? this.locales.weekdaysShort[day]
-      : this.token === "dddd"
-      ? this.locales.weekdays[day]
-      : date;
+    const date = this.date.getDate();
+    const day = this.date.getDay();
+
+    switch (this.token) {
+      case "DD":
+        return String(date).padStart(2, "0");
+      case "Do":
+        return `${date}${getOrdinalSuffix(date)}`;
+      case "d":
+        return String(day + 1);
+      case "ddd":
+        return this.locales.weekdaysShort[day];
+      case "dddd":
+        return this.locales.weekdays[day];
+      default:
+        return String(date);
+    }
   }
 }
-
-module.exports = Day;

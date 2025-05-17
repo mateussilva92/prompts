@@ -1,6 +1,6 @@
-const DatePart = require("./datepart");
+import { DatePart } from "./datepart";
 
-class Year extends DatePart {
+export class Year extends DatePart {
   constructor(opts = {}) {
     super(opts);
   }
@@ -13,14 +13,15 @@ class Year extends DatePart {
     this.date.setFullYear(this.date.getFullYear() - 1);
   }
 
-  setTo(val) {
-    this.date.setFullYear(val.substr(-4));
+  setTo(val: string): void {
+    const year = parseInt(val.slice(-4));
+    if (!isNaN(year)) {
+      this.date.setFullYear(year);
+    }
   }
 
-  toString() {
-    let year = String(this.date.getFullYear()).padStart(4, "0");
-    return this.token.length === 2 ? year.substr(-2) : year;
+  toString(): string {
+    const year = String(this.date.getFullYear()).padStart(4, "0");
+    return this.token.length === 2 ? year.slice(-2) : year;
   }
 }
-
-module.exports = Year;

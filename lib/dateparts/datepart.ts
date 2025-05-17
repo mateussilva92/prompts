@@ -1,5 +1,17 @@
-class DatePart {
-  constructor({ token, date, parts, locales }) {
+type DatePartOptions = {
+  token: string;
+  date?: Date;
+  parts?: DatePart[];
+  locales?: Record<string, unknown>;
+};
+
+export class DatePart {
+  token: string;
+  date: Date;
+  parts: DatePart[];
+  locales: Record<string, unknown>;
+
+  constructor({ token, date, parts, locales }: DatePartOptions) {
     this.token = token;
     this.date = date || new Date();
     this.parts = parts || [this];
@@ -11,25 +23,24 @@ class DatePart {
   down() {}
 
   next() {
-    const currentIdx = this.parts.indexOf(this);
-    return this.parts.find(
-      (part, idx) => idx > currentIdx && part instanceof DatePart
-    );
+    const currentIndex = this.parts.indexOf(this);
+    return this.parts
+      .slice(currentIndex + 1)
+      .find((part) => part instanceof DatePart);
   }
 
-  setTo(val) {}
+  setTo(val: string) {}
 
   prev() {
-    let parts = [].concat(this.parts).reverse();
-    const currentIdx = parts.indexOf(this);
-    return parts.find(
-      (part, idx) => idx > currentIdx && part instanceof DatePart
-    );
+    const reversedParts = [...this.parts].reverse();
+    const currentIndex = reversedParts.indexOf(this);
+
+    return reversedParts
+      .slice(currentIndex + 1)
+      .find((part) => part instanceof DatePart);
   }
 
   toString() {
     return String(this.date);
   }
 }
-
-module.exports = DatePart;

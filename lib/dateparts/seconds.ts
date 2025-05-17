@@ -1,6 +1,6 @@
-const DatePart = require("./datepart");
+import { DatePart } from "./datepart";
 
-class Seconds extends DatePart {
+export class Seconds extends DatePart {
   constructor(opts = {}) {
     super(opts);
   }
@@ -13,14 +13,17 @@ class Seconds extends DatePart {
     this.date.setSeconds(this.date.getSeconds() - 1);
   }
 
-  setTo(val) {
-    this.date.setSeconds(parseInt(val.substr(-2)));
+  setTo(val: string) {
+    const seconds = parseInt(val.slice(-2));
+    if (!isNaN(seconds)) {
+      this.date.setSeconds(seconds);
+    }
   }
 
-  toString() {
-    let s = this.date.getSeconds();
-    return this.token.length > 1 ? String(s).padStart(2, "0") : s;
+  toString(): string {
+    const seconds = this.date.getSeconds();
+    return this.token.length > 1
+      ? String(seconds).padStart(2, "0")
+      : String(seconds);
   }
 }
-
-module.exports = Seconds;
