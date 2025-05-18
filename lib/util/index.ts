@@ -1,10 +1,8 @@
-module.exports = {
-  action: require("./action"),
-  clear: require("./clear"),
-  style: require("./style"),
-  strip: require("./strip"),
-  figures: require("./figures"),
-  lines: require("./lines"),
-  wrap: require("./wrap"),
-  entriesToDisplay: require("./entriesToDisplay"),
-};
+export * from "./action";
+export * from "./clear";
+export * from "./entriesToDisplay";
+export * from "./figures";
+export * from "./lines";
+export * from "./strip";
+// export * from "./style";
+// export * from "./wrap";

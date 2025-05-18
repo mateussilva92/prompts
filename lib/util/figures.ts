@@ -1,4 +1,19 @@
-const main = {
+type Figures = {
+  arrowUp: string;
+  arrowDown: string;
+  arrowLeft: string;
+  arrowRight: string;
+  radioOn: string;
+  radioOff: string;
+  tick: string;
+  cross: string;
+  ellipsis: string;
+  pointerSmall: string;
+  line: string;
+  pointer: string;
+};
+
+const main: Figures = {
   arrowUp: "↑",
   arrowDown: "↓",
   arrowLeft: "←",
@@ -12,7 +27,8 @@ const main = {
   line: "─",
   pointer: "❯",
 };
-const win = {
+
+const win: Figures = {
   arrowUp: main.arrowUp,
   arrowDown: main.arrowDown,
   arrowLeft: main.arrowLeft,
@@ -26,6 +42,5 @@ const win = {
   line: "─",
   pointer: ">",
 };
-const figures = process.platform === "win32" ? win : main;
 
-module.exports = figures;
+export const figures = process.platform === "win32" ? win : main;

@@ -1,17 +1,23 @@
 /**
- * @param {string} msg The message to wrap
- * @param {object} opts
- * @param {number|string} [opts.margin] Left margin
- * @param {number} opts.width Maximum characters per line including the margin
+ * @param {string} message The message to wrap
+ * @param {object} options
+ * @param {number|string} [options.margin] Left margin
+ * @param {number} options.width Maximum characters per line including the margin
  */
-module.exports = (msg, opts = {}) => {
-  const tab = Number.isSafeInteger(parseInt(opts.margin))
-    ? new Array(parseInt(opts.margin)).fill(" ").join("")
-    : opts.margin || "";
+export function wrap(
+  message: string,
+  options: { margin?: number | string; width: number }
+): string {
+  const { width, margin } = options;
 
-  const width = opts.width;
+  let tab = "";
+  if (typeof margin === "number" && Number.isSafeInteger(margin)) {
+    tab = " ".repeat(margin);
+  } else if (typeof margin === "string") {
+    tab = margin;
+  }
 
-  return (msg || "")
+  return (message || "")
     .split(/\r?\n/g)
     .map((line) =>
       line
@@ -31,4 +37,4 @@ module.exports = (msg, opts = {}) => {
         .join("\n")
     )
     .join("\n");
-};
+}

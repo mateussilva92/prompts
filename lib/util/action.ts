@@ -1,37 +1,74 @@
-module.exports = (key, isSelect) => {
-  if (key.meta && key.name !== "escape") return;
+interface Key {
+  name: string;
+  ctrl?: boolean;
+  meta?: boolean;
+}
 
-  if (key.ctrl) {
-    if (key.name === "a") return "first";
-    if (key.name === "c") return "abort";
-    if (key.name === "d") return "abort";
-    if (key.name === "e") return "last";
-    if (key.name === "g") return "reset";
+type Action =
+  | "first"
+  | "abort"
+  | "last"
+  | "reset"
+  | "down"
+  | "up"
+  | "submit"
+  | "delete"
+  | "deleteForward"
+  | "exit"
+  | "next"
+  | "nextPage"
+  | "prevPage"
+  | "home"
+  | "end"
+  | "right"
+  | "left"
+  | false;
+
+const keyActionMap = {
+  ctrl: {
+    a: "first",
+    c: "abort",
+    d: "abort",
+    e: "last",
+    g: "reset",
+  } as Record<string, Action>,
+  selectMode: {
+    j: "down",
+    k: "up",
+  } as Record<string, Action>,
+  general: {
+    return: "submit",
+    enter: "submit",
+    backspace: "delete",
+    delete: "deleteForward",
+    abort: "abort",
+    escape: "exit",
+    tab: "next",
+    pagedown: "nextPage",
+    pageup: "prevPage",
+    home: "home",
+    end: "end",
+    up: "up",
+    down: "down",
+    right: "right",
+    left: "left",
+  } as Record<string, Action>,
+};
+
+export function action({ name, ctrl, meta }: Key, isSelect: boolean): Action {
+  if (meta && name !== "escape") return false;
+
+  if (ctrl && keyActionMap.ctrl[name]) {
+    return keyActionMap.ctrl[name];
   }
 
-  if (isSelect) {
-    if (key.name === "j") return "down";
-    if (key.name === "k") return "up";
+  if (isSelect && keyActionMap.selectMode[name]) {
+    return keyActionMap.selectMode[name];
   }
 
-  if (key.name === "return") return "submit";
-  if (key.name === "enter") return "submit"; // ctrl + J
-  if (key.name === "backspace") return "delete";
-  if (key.name === "delete") return "deleteForward";
-  if (key.name === "abort") return "abort";
-  if (key.name === "escape") return "exit";
-  if (key.name === "tab") return "next";
-  if (key.name === "pagedown") return "nextPage";
-  if (key.name === "pageup") return "prevPage";
-  // TODO create home() in prompt types (e.g. TextPrompt)
-  if (key.name === "home") return "home";
-  // TODO create end() in prompt types (e.g. TextPrompt)
-  if (key.name === "end") return "end";
-
-  if (key.name === "up") return "up";
-  if (key.name === "down") return "down";
-  if (key.name === "right") return "right";
-  if (key.name === "left") return "left";
+  if (keyActionMap.general[name]) {
+    return keyActionMap.general[name];
+  }
 
   return false;
-};
+}
