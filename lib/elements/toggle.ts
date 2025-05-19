@@ -1,118 +1,135 @@
-const color = require("kleur");
-const Prompt = require("./prompt");
-const { style, clear } = require("../util");
-const { cursor, erase } = require("sisteransi");
+import kleur from "kleur";
+import { Key } from "readline";
+import { cursor, erase } from "sisteransi";
+import { clear, delimiter, symbol } from "../util";
+import { Prompt, PromptOptions } from "./prompt";
+
+type TogglePromptOptions = PromptOptions & {
+	message: string;
+	initial: boolean;
+	active?: string;
+	inactive?: string;
+};
 
 /**
- * TogglePrompt Base Element
- * @param {Object} opts Options
- * @param {String} opts.message Message
- * @param {Boolean} [opts.initial=false] Default value
- * @param {String} [opts.active='no'] Active label
- * @param {String} [opts.inactive='off'] Inactive label
- * @param {Stream} [opts.stdin] The Readable stream to listen to
- * @param {Stream} [opts.stdout] The Writable stream to write readline data to
+ * A toggle prompt that switches between two states (on/off).
  */
-class TogglePrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.msg = opts.message;
-    this.value = !!opts.initial;
-    this.active = opts.active || "on";
-    this.inactive = opts.inactive || "off";
-    this.initialValue = this.value;
-    this.render();
-  }
+export class TogglePrompt extends Prompt<boolean> {
+	protected message: string;
+	protected active: string;
+	protected inactive: string;
+	protected initialValue: boolean;
 
-  reset() {
-    this.value = this.initialValue;
-    this.fire();
-    this.render();
-  }
+	constructor(options: TogglePromptOptions) {
+		super(options);
 
-  exit() {
-    this.abort();
-  }
+		this.message = options.message;
+		this.value = !!options.initial;
+		this.active = options.active || "on";
+		this.inactive = options.inactive || "off";
+		this.initialValue = this.value;
 
-  abort() {
-    this.done = this.aborted = true;
-    this.fire();
-    this.render();
-    this.out.write("\n");
-    this.close();
-  }
+		this.render();
+	}
 
-  submit() {
-    this.done = true;
-    this.aborted = false;
-    this.fire();
-    this.render();
-    this.out.write("\n");
-    this.close();
-  }
+	protected reset() {
+		this.value = this.initialValue;
+		this.fire();
+		this.render();
+	}
 
-  deactivate() {
-    if (this.value === false) return this.bell();
-    this.value = false;
-    this.render();
-  }
+	protected exit() {
+		this.abort();
+	}
 
-  activate() {
-    if (this.value === true) return this.bell();
-    this.value = true;
-    this.render();
-  }
+	protected abort() {
+		this.done = this.aborted = true;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-  delete() {
-    this.deactivate();
-  }
-  left() {
-    this.deactivate();
-  }
-  right() {
-    this.activate();
-  }
-  down() {
-    this.deactivate();
-  }
-  up() {
-    this.activate();
-  }
+	protected submit() {
+		this.done = true;
+		this.aborted = false;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-  next() {
-    this.value = !this.value;
-    this.fire();
-    this.render();
-  }
+	protected deactivate() {
+		if (this.value === false) return this.bell();
+		this.value = false;
+		this.render();
+	}
 
-  _(c, key) {
-    if (c === " ") {
-      this.value = !this.value;
-    } else if (c === "1") {
-      this.value = true;
-    } else if (c === "0") {
-      this.value = false;
-    } else return this.bell();
-    this.render();
-  }
+	protected activate() {
+		if (this.value === true) return this.bell();
+		this.value = true;
+		this.render();
+	}
 
-  render() {
-    if (this.closed) return;
-    if (this.firstRender) this.out.write(cursor.hide);
-    else this.out.write(clear(this.outputText, this.out.columns));
-    super.render();
+	protected delete() {
+		this.deactivate();
+	}
+	protected left() {
+		this.deactivate();
+	}
+	protected right() {
+		this.activate();
+	}
+	protected down() {
+		this.deactivate();
+	}
+	protected up() {
+		this.activate();
+	}
 
-    this.outputText = [
-      style.symbol(this.done, this.aborted),
-      color.bold(this.msg),
-      style.delimiter(this.done),
-      this.value ? this.inactive : color.cyan().underline(this.inactive),
-      color.gray("/"),
-      this.value ? color.cyan().underline(this.active) : this.active,
-    ].join(" ");
+	protected next() {
+		this.value = !this.value;
+		this.fire();
+		this.render();
+	}
 
-    this.out.write(erase.line + cursor.to(0) + this.outputText);
-  }
+	protected keyHandler(char: string, key: Key) {
+		switch (char) {
+			case " ":
+				this.value = !this.value;
+				break;
+
+			case "1":
+				this.value = true;
+				break;
+
+			case "0":
+				this.value = false;
+				break;
+
+			default:
+				return this.bell();
+		}
+
+		super.keyHandler(char, key);
+	}
+
+	render() {
+		if (this.closed) return;
+
+		if (this.firstRender) this.stdout.write(cursor.hide);
+		else this.stdout.write(clear(this.outputText, this.stdout.columns));
+		super.render();
+
+		this.outputText = [
+			symbol(this.done, this.aborted, false),
+			kleur.bold(this.message),
+			delimiter(this.done),
+			this.value ? this.inactive : kleur.cyan().underline(this.inactive),
+			kleur.gray("/"),
+			this.value ? kleur.cyan().underline(this.active) : this.active,
+		].join(" ");
+
+		this.stdout.write(erase.line + cursor.to(0) + this.outputText);
+	}
 }
-
-module.exports = TogglePrompt;

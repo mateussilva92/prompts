@@ -5,7 +5,7 @@ import { beep, cursor } from "sisteransi";
 import { ReadStream, WriteStream } from "tty";
 import { action } from "../util";
 
-type PromptOptions = {
+export type PromptOptions = {
 	stdin?: ReadStream;
 	stdout?: WriteStream;
 	onRender?: (kleur: Kleur) => void;
@@ -14,16 +14,21 @@ type PromptOptions = {
 /**
  * Base prompt skeleton
  */
-class Prompt<T = unknown> extends EventEmitter {
+export class Prompt<T = unknown> extends EventEmitter {
 	private stdin: ReadStream;
 	protected stdout: WriteStream;
 	protected onRender: (kleur: Kleur) => void;
 
-	protected firstRender = true;
-	protected closed = false;
 	protected value?: T;
-	protected aborted = false;
+
+	protected firstRender = true;
+	// TODO: Add doc for each prop bellow
+	protected closed = false;
+	protected done = false;
 	protected exited = false;
+	protected aborted = false;
+
+	protected outputText = "";
 
 	private isSelectPrompt: boolean = false;
 	private rl: readline.Interface;
@@ -45,7 +50,7 @@ class Prompt<T = unknown> extends EventEmitter {
 			this.stdin.setRawMode(true);
 		}
 
-		const isSelectPrompt = ["SelectPrompt", "MultiselectPrompt"].includes(
+		this.isSelectPrompt = ["SelectPrompt", "MultiselectPrompt"].includes(
 			this.constructor.name
 		);
 
@@ -53,11 +58,11 @@ class Prompt<T = unknown> extends EventEmitter {
 	}
 
 	/** Handle keypress events */
-	private handleKeypress = (str: string, key: Key): void => {
+	private handleKeypress = (char: string, key: Key): void => {
 		const act = action(key, this.isSelectPrompt);
 
 		if (act === false) {
-			this.keyHandler?.(str, key);
+			this.keyHandler?.(char, key);
 		} else if (typeof (this as any)[act] === "function") {
 			(this as any)[act](key);
 		} else {
@@ -83,15 +88,15 @@ class Prompt<T = unknown> extends EventEmitter {
 	}
 
 	protected keyHandler(char: string, key: Key): void {
-		throw new Error("Method 'keyHandler' not implemented.");
+		this.render();
 	}
 
 	/** Trigger a state update */
 	protected fire(): void {
 		this.emit("state", {
 			value: this.value,
-			aborted: !!this.aborted,
-			exited: !!this.exited,
+			aborted: this.aborted,
+			exited: this.exited,
 		});
 	}
 

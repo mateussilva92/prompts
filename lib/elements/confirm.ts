@@ -1,7 +1,17 @@
-const color = require("kleur");
-const Prompt = require("./prompt");
-const { style, clear } = require("../util");
-const { erase, cursor } = require("sisteransi");
+import kleur from "kleur";
+import { Key } from "readline";
+import { cursor, erase } from "sisteransi";
+import { clear, delimiter, symbol } from "../util";
+import { Prompt, PromptOptions } from "./prompt";
+
+type ConfirmPromptOptions = PromptOptions & {
+	message: string;
+	initial: boolean;
+	yes?: string;
+	yesOption?: string;
+	no?: string;
+	noOption?: string;
+};
 
 /**
  * ConfirmPrompt Base Element
@@ -15,78 +25,94 @@ const { erase, cursor } = require("sisteransi");
  * @param {String} [opts.no] The "No" label
  * @param {String} [opts.noOption] The "No" option when choosing between yes/no
  */
-class ConfirmPrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.msg = opts.message;
-    this.value = opts.initial;
-    this.initialValue = !!opts.initial;
-    this.yesMsg = opts.yes || "yes";
-    this.yesOption = opts.yesOption || "(Y/n)";
-    this.noMsg = opts.no || "no";
-    this.noOption = opts.noOption || "(y/N)";
-    this.render();
-  }
+export class ConfirmPrompt extends Prompt<boolean> {
+	protected message: string;
+	protected yesMessage: string;
+	protected yesOption: string;
+	protected noMessage: string;
+	protected noOption: string;
+	protected initialValue: boolean;
 
-  reset() {
-    this.value = this.initialValue;
-    this.fire();
-    this.render();
-  }
+	constructor(options: ConfirmPromptOptions) {
+		super(options);
 
-  exit() {
-    this.abort();
-  }
+		this.message = options.message;
+		this.value = options.initial;
+		this.initialValue = this.value;
+		this.yesMessage = options.yes || "yes";
+		this.yesOption = options.yesOption || "(Y/n)";
+		this.noMessage = options.no || "no";
+		this.noOption = options.noOption || "(y/N)";
+		this.render();
+	}
 
-  abort() {
-    this.done = this.aborted = true;
-    this.fire();
-    this.render();
-    this.out.write("\n");
-    this.close();
-  }
+	reset() {
+		this.value = this.initialValue;
+		this.fire();
+		this.render();
+	}
 
-  submit() {
-    this.value = this.value || false;
-    this.done = true;
-    this.aborted = false;
-    this.fire();
-    this.render();
-    this.out.write("\n");
-    this.close();
-  }
+	exit() {
+		this.abort();
+	}
 
-  _(c, key) {
-    if (c.toLowerCase() === "y") {
-      this.value = true;
-      return this.submit();
-    }
-    if (c.toLowerCase() === "n") {
-      this.value = false;
-      return this.submit();
-    }
-    return this.bell();
-  }
+	abort() {
+		this.done = this.aborted = true;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-  render() {
-    if (this.closed) return;
-    if (this.firstRender) this.out.write(cursor.hide);
-    else this.out.write(clear(this.outputText, this.out.columns));
-    super.render();
+	submit() {
+		this.value = this.value || false;
+		this.done = true;
+		this.aborted = false;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-    this.outputText = [
-      style.symbol(this.done, this.aborted),
-      color.bold(this.msg),
-      style.delimiter(this.done),
-      this.done
-        ? this.value
-          ? this.yesMsg
-          : this.noMsg
-        : color.gray(this.initialValue ? this.yesOption : this.noOption),
-    ].join(" ");
+	keyHandler(char: string, key: Key) {
+		switch (char.toLowerCase()) {
+			case "y":
+				this.value = true;
+				break;
 
-    this.out.write(erase.line + cursor.to(0) + this.outputText);
-  }
+			case "n":
+				this.value = false;
+				break;
+
+			default:
+				this.bell();
+				return;
+		}
+
+		this.submit();
+	}
+
+	render() {
+		if (this.closed) return;
+
+		if (this.firstRender) {
+			this.stdout.write(cursor.hide);
+		} else {
+			this.stdout.write(clear(this.outputText, this.stdout.columns));
+		}
+		super.render();
+
+		this.outputText = [
+			symbol(this.done, this.aborted, false),
+			kleur.bold(this.message),
+			delimiter(this.done),
+			this.done
+				? this.value
+					? this.yesMessage
+					: this.noMessage
+				: kleur.gray(this.initialValue ? this.yesOption : this.noOption),
+		].join(" ");
+
+		this.stdout.write(erase.line + cursor.to(0) + this.outputText);
+	}
 }
-
-module.exports = ConfirmPrompt;
