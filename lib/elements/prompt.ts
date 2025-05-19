@@ -1,73 +1,110 @@
-const readline = require("readline");
-const { action } = require("../util");
-const EventEmitter = require("events");
-const { beep, cursor } = require("sisteransi");
-const color = require("kleur");
+import EventEmitter from "events";
+import kleur, { Kleur } from "kleur";
+import readline, { Key } from "readline";
+import { beep, cursor } from "sisteransi";
+import { ReadStream, WriteStream } from "tty";
+import { action } from "../util";
+
+type PromptOptions = {
+	stdin?: ReadStream;
+	stdout?: WriteStream;
+	onRender?: (kleur: Kleur) => void;
+};
 
 /**
  * Base prompt skeleton
- * @param {Stream} [opts.stdin] The Readable stream to listen to
- * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  */
-class Prompt extends EventEmitter {
-  constructor(opts = {}) {
-    super();
+class Prompt<T = unknown> extends EventEmitter {
+	private stdin: ReadStream;
+	protected stdout: WriteStream;
+	protected onRender: (kleur: Kleur) => void;
 
-    this.firstRender = true;
-    this.in = opts.stdin || process.stdin;
-    this.out = opts.stdout || process.stdout;
-    this.onRender = (opts.onRender || (() => void 0)).bind(this);
-    const rl = readline.createInterface({
-      input: this.in,
-      escapeCodeTimeout: 50,
-    });
-    readline.emitKeypressEvents(this.in, rl);
+	protected firstRender = true;
+	protected closed = false;
+	protected value?: T;
+	protected aborted = false;
+	protected exited = false;
 
-    if (this.in.isTTY) this.in.setRawMode(true);
-    const isSelect =
-      ["SelectPrompt", "MultiselectPrompt"].indexOf(this.constructor.name) > -1;
-    const keypress = (str, key) => {
-      let a = action(key, isSelect);
-      if (a === false) {
-        this._ && this._(str, key);
-      } else if (typeof this[a] === "function") {
-        this[a](key);
-      } else {
-        this.bell();
-      }
-    };
+	private isSelectPrompt: boolean = false;
+	private rl: readline.Interface;
 
-    this.close = () => {
-      this.out.write(cursor.show);
-      this.in.removeListener("keypress", keypress);
-      if (this.in.isTTY) this.in.setRawMode(false);
-      rl.close();
-      this.emit(
-        this.aborted ? "abort" : this.exited ? "exit" : "submit",
-        this.value
-      );
-      this.closed = true;
-    };
+	constructor(options: PromptOptions = {}) {
+		super();
 
-    this.in.on("keypress", keypress);
-  }
+		this.stdin = options.stdin ?? process.stdin;
+		this.stdout = options.stdout ?? process.stdout;
+		this.onRender = (options.onRender ?? (() => {})).bind(this);
 
-  fire() {
-    this.emit("state", {
-      value: this.value,
-      aborted: !!this.aborted,
-      exited: !!this.exited,
-    });
-  }
+		this.rl = readline.createInterface({
+			input: this.stdin,
+			escapeCodeTimeout: 50,
+		});
+		readline.emitKeypressEvents(this.stdin, this.rl);
 
-  bell() {
-    this.out.write(beep);
-  }
+		if (this.stdin.isTTY) {
+			this.stdin.setRawMode(true);
+		}
 
-  render() {
-    this.onRender(color);
-    if (this.firstRender) this.firstRender = false;
-  }
+		const isSelectPrompt = ["SelectPrompt", "MultiselectPrompt"].includes(
+			this.constructor.name
+		);
+
+		this.stdin.on("keypress", this.handleKeypress);
+	}
+
+	/** Handle keypress events */
+	private handleKeypress = (str: string, key: Key): void => {
+		const act = action(key, this.isSelectPrompt);
+
+		if (act === false) {
+			this.keyHandler?.(str, key);
+		} else if (typeof (this as any)[act] === "function") {
+			(this as any)[act](key);
+		} else {
+			this.bell();
+		}
+	};
+
+	/** Closes the prompt, finalizing user input */
+	protected close(): void {
+		this.stdout.write(cursor.show);
+		this.stdin.removeListener("keypress", this.handleKeypress);
+
+		if (this.stdin.isTTY) {
+			this.stdin.setRawMode(false);
+		}
+
+		this.rl.close();
+
+		const event = this.aborted ? "abort" : this.exited ? "exit" : "submit";
+
+		this.emit(event, this.value);
+		this.closed = true;
+	}
+
+	protected keyHandler(char: string, key: Key): void {
+		throw new Error("Method 'keyHandler' not implemented.");
+	}
+
+	/** Trigger a state update */
+	protected fire(): void {
+		this.emit("state", {
+			value: this.value,
+			aborted: !!this.aborted,
+			exited: !!this.exited,
+		});
+	}
+
+	/** Play terminal bell sound */
+	protected bell(): void {
+		this.stdout.write(beep);
+	}
+
+	/** Render the prompt to screen */
+	protected render(): void {
+		this.onRender(kleur);
+		if (this.firstRender) this.firstRender = false;
+	}
 }
 
 module.exports = Prompt;
