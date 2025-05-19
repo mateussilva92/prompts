@@ -49,9 +49,7 @@ export class NumberPrompt extends Prompt<number | ""> {
 	protected min: number;
 	protected max: number;
 	protected errorMsg: string;
-	protected validator: (
-		val: number
-	) => boolean | string | Promise<boolean | string>;
+	protected validator: NonNullable<NumberPromptOptions["validate"]>;
 	protected color: keyof Kleur = "cyan";
 	protected placeholder: boolean = true;
 	protected rendered: string = "";

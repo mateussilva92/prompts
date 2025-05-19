@@ -1,7 +1,16 @@
-const color = require("kleur");
-const Prompt = require("./prompt");
-const { erase, cursor } = require("sisteransi");
-const { style, clear, lines, figures } = require("../util");
+import kleur from "kleur";
+import { Key } from "readline";
+import { cursor, erase } from "sisteransi";
+import { clear, delimiter, figures, lines, render, symbol } from "../util";
+import { Prompt, PromptOptions } from "./prompt";
+
+export interface TextPromptOptions extends PromptOptions {
+	message: string;
+	style?: string;
+	initial?: string;
+	validate?: (value: string) => boolean | string | Promise<boolean | string>;
+	error?: string;
+}
 
 /**
  * TextPrompt Base Element
@@ -14,216 +23,246 @@ const { style, clear, lines, figures } = require("../util");
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  * @param {String} [opts.error] The invalid error label
  */
-class TextPrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.transform = style.render(opts.style);
-    this.scale = this.transform.scale;
-    this.msg = opts.message;
-    this.initial = opts.initial || ``;
-    this.validator = opts.validate || (() => true);
-    this.value = ``;
-    this.errorMsg = opts.error || `Please Enter A Valid Value`;
-    this.cursor = Number(!!this.initial);
-    this.cursorOffset = 0;
-    this.clear = clear(``, this.out.columns);
-    this.render();
-  }
+export class TextPrompt extends Prompt<string> {
+	protected message: string;
+	protected initial: string;
+	protected transform: ReturnType<typeof style.render>;
+	protected scale: number;
+	protected validator: NonNullable<TextPromptOptions["validate"]>;
+	protected errorMsg: string;
+	protected cursor: number;
+	protected cursorOffset: number;
+	protected clear: string;
+	protected red: boolean = false;
+	protected placeholder: boolean = true;
+	protected rendered: string = "";
+	protected outputText: string = "";
+	protected outputError: string = "";
+	protected done: boolean = false;
+	protected error: boolean = false;
 
-  set value(v) {
-    if (!v && this.initial) {
-      this.placeholder = true;
-      this.rendered = color.gray(this.transform.render(this.initial));
-    } else {
-      this.placeholder = false;
-      this.rendered = this.transform.render(v);
-    }
-    this._value = v;
-    this.fire();
-  }
+	constructor(options: TextPromptOptions) {
+		super(options);
 
-  get value() {
-    return this._value;
-  }
+		this.message = options.message;
+		this.transform = render(options.style || "default");
+		this.scale = this.transform.scale;
+		this.initial = options.initial ?? "";
+		this.validator = options.validate ?? (() => true);
+		this.errorMsg = options.error || "Please Enter A Valid Value";
+		this.cursor = Number(!!this.initial);
+		this.cursorOffset = 0;
+		this.clear = clear("", this.stdout.columns);
 
-  reset() {
-    this.value = ``;
-    this.cursor = Number(!!this.initial);
-    this.cursorOffset = 0;
-    this.fire();
-    this.render();
-  }
+		this.value = "";
 
-  exit() {
-    this.abort();
-  }
+		this.render();
+	}
 
-  abort() {
-    this.value = this.value || this.initial;
-    this.done = this.aborted = true;
-    this.error = false;
-    this.red = false;
-    this.fire();
-    this.render();
-    this.out.write("\n");
-    this.close();
-  }
+	protected set value(val) {
+		if (!val && this.initial) {
+			this.placeholder = true;
+			this.rendered = kleur.gray(this.transform.render(this.initial));
+		} else {
+			this.placeholder = false;
+			this.rendered = this.transform.render(val);
+		}
+		this._value = val;
+		this.fire();
+	}
 
-  async validate() {
-    let valid = await this.validator(this.value);
-    if (typeof valid === `string`) {
-      this.errorMsg = valid;
-      valid = false;
-    }
-    this.error = !valid;
-  }
+	protected get value() {
+		return this._value;
+	}
 
-  async submit() {
-    this.value = this.value || this.initial;
-    this.cursorOffset = 0;
-    this.cursor = this.rendered.length;
-    await this.validate();
-    if (this.error) {
-      this.red = true;
-      this.fire();
-      this.render();
-      return;
-    }
-    this.done = true;
-    this.aborted = false;
-    this.fire();
-    this.render();
-    this.out.write("\n");
-    this.close();
-  }
+	protected reset(): void {
+		this.value = "";
+		this.cursor = Number(!!this.initial);
+		this.cursorOffset = 0;
+		this.fire();
+		this.render();
+	}
 
-  next() {
-    if (!this.placeholder) return this.bell();
-    this.value = this.initial;
-    this.cursor = this.rendered.length;
-    this.fire();
-    this.render();
-  }
+	protected exit(): void {
+		this.abort();
+	}
 
-  moveCursor(n) {
-    if (this.placeholder) return;
-    this.cursor = this.cursor + n;
-    this.cursorOffset += n;
-  }
+	public abort(): void {
+		this.value = this.value || this.initial;
+		this.done = this.aborted = true;
+		this.error = false;
+		this.red = false;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-  _(c, key) {
-    let s1 = this.value.slice(0, this.cursor);
-    let s2 = this.value.slice(this.cursor);
-    this.value = `${s1}${c}${s2}`;
-    this.red = false;
-    this.cursor = this.placeholder ? 0 : s1.length + 1;
-    this.render();
-  }
+	protected async validate() {
+		let valid = await this.validator(this.value);
+		if (typeof valid === "string") {
+			this.errorMsg = valid;
+			valid = false;
+		}
+		this.error = !valid;
+	}
 
-  delete() {
-    if (this.isCursorAtStart()) return this.bell();
-    let s1 = this.value.slice(0, this.cursor - 1);
-    let s2 = this.value.slice(this.cursor);
-    this.value = `${s1}${s2}`;
-    this.red = false;
-    if (this.isCursorAtStart()) {
-      this.cursorOffset = 0;
-    } else {
-      this.cursorOffset++;
-      this.moveCursor(-1);
-    }
-    this.render();
-  }
+	protected async submit(): Promise<void> {
+		this.value = this.value || this.initial;
+		this.cursorOffset = 0;
+		this.cursor = this.rendered.length;
+		await this.validate();
 
-  deleteForward() {
-    if (this.cursor * this.scale >= this.rendered.length || this.placeholder)
-      return this.bell();
-    let s1 = this.value.slice(0, this.cursor);
-    let s2 = this.value.slice(this.cursor + 1);
-    this.value = `${s1}${s2}`;
-    this.red = false;
-    if (this.isCursorAtEnd()) {
-      this.cursorOffset = 0;
-    } else {
-      this.cursorOffset++;
-    }
-    this.render();
-  }
+		if (this.error) {
+			this.red = true;
+			this.fire();
+			this.render();
+			return;
+		}
 
-  first() {
-    this.cursor = 0;
-    this.render();
-  }
+		this.done = true;
+		this.aborted = false;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-  last() {
-    this.cursor = this.value.length;
-    this.render();
-  }
+	protected next(): void {
+		if (!this.placeholder) return this.bell();
+		this.value = this.initial;
+		this.cursor = this.rendered.length;
+		this.fire();
+		this.render();
+	}
 
-  left() {
-    if (this.cursor <= 0 || this.placeholder) return this.bell();
-    this.moveCursor(-1);
-    this.render();
-  }
+	moveCursor(num: number): void {
+		if (this.placeholder) return;
+		this.cursor = this.cursor + num;
+		this.cursorOffset += num;
+	}
 
-  right() {
-    if (this.cursor * this.scale >= this.rendered.length || this.placeholder)
-      return this.bell();
-    this.moveCursor(1);
-    this.render();
-  }
+	keyHandler(char: string, key: Key): void {
+		let s1 = this.value.slice(0, this.cursor);
+		let s2 = this.value.slice(this.cursor);
+		this.value = `${s1}${char}${s2}`;
+		this.red = false;
+		this.cursor = this.placeholder ? 0 : s1.length + 1;
+		this.render();
+	}
 
-  isCursorAtStart() {
-    return this.cursor === 0 || (this.placeholder && this.cursor === 1);
-  }
+	delete(): void {
+		if (this.isCursorAtStart()) return this.bell();
+		let s1 = this.value.slice(0, this.cursor - 1);
+		let s2 = this.value.slice(this.cursor);
+		this.value = `${s1}${s2}`;
+		this.red = false;
 
-  isCursorAtEnd() {
-    return (
-      this.cursor === this.rendered.length ||
-      (this.placeholder && this.cursor === this.rendered.length + 1)
-    );
-  }
+		if (this.isCursorAtStart()) {
+			this.cursorOffset = 0;
+		} else {
+			this.cursorOffset++;
+			this.moveCursor(-1);
+		}
 
-  render() {
-    if (this.closed) return;
-    if (!this.firstRender) {
-      if (this.outputError)
-        this.out.write(
-          cursor.down(lines(this.outputError, this.out.columns) - 1) +
-            clear(this.outputError, this.out.columns)
-        );
-      this.out.write(clear(this.outputText, this.out.columns));
-    }
-    super.render();
-    this.outputError = "";
+		this.render();
+	}
 
-    this.outputText = [
-      style.symbol(this.done, this.aborted),
-      color.bold(this.msg),
-      style.delimiter(this.done),
-      this.red ? color.red(this.rendered) : this.rendered,
-    ].join(` `);
+	deleteForward(): void {
+		if (this.cursor * this.scale >= this.rendered.length || this.placeholder) {
+			return this.bell();
+		}
 
-    if (this.error) {
-      this.outputError += this.errorMsg
-        .split(`\n`)
-        .reduce(
-          (a, l, i) =>
-            a + `\n${i ? " " : figures.pointerSmall} ${color.red().italic(l)}`,
-          ``
-        );
-    }
+		let s1 = this.value.slice(0, this.cursor);
+		let s2 = this.value.slice(this.cursor + 1);
+		this.value = `${s1}${s2}`;
+		this.red = false;
 
-    this.out.write(
-      erase.line +
-        cursor.to(0) +
-        this.outputText +
-        cursor.save +
-        this.outputError +
-        cursor.restore +
-        cursor.move(this.cursorOffset, 0)
-    );
-  }
+		if (this.isCursorAtEnd()) {
+			this.cursorOffset = 0;
+		} else {
+			this.cursorOffset++;
+		}
+
+		this.render();
+	}
+
+	first(): void {
+		this.cursor = 0;
+		this.render();
+	}
+
+	last(): void {
+		this.cursor = this.value.length;
+		this.render();
+	}
+
+	left(): void {
+		if (this.cursor <= 0 || this.placeholder) return this.bell();
+		this.moveCursor(-1);
+		this.render();
+	}
+
+	right(): void {
+		if (this.cursor * this.scale >= this.rendered.length || this.placeholder) {
+			return this.bell();
+		}
+		this.moveCursor(1);
+		this.render();
+	}
+
+	protected isCursorAtStart(): boolean {
+		return this.cursor === 0 || (this.placeholder && this.cursor === 1);
+	}
+
+	protected isCursorAtEnd(): boolean {
+		return (
+			this.cursor === this.rendered.length ||
+			(this.placeholder && this.cursor === this.rendered.length + 1)
+		);
+	}
+
+	render(): void {
+		if (this.closed) return;
+
+		if (!this.firstRender) {
+			if (this.outputError)
+				this.stdout.write(
+					cursor.down(lines(this.outputError, this.stdout.columns) - 1) +
+						clear(this.outputError, this.stdout.columns)
+				);
+			this.stdout.write(clear(this.outputText, this.stdout.columns));
+		}
+
+		super.render();
+		this.outputError = "";
+
+		this.outputText = [
+			symbol(this.done, this.aborted, false),
+			color.bold(this.message),
+			delimiter(this.done),
+			this.red ? color.red(this.rendered) : this.rendered,
+		].join(" ");
+
+		if (this.error) {
+			this.outputError += this.errorMsg
+				.split("\n")
+				.reduce(
+					(acc, line, i) =>
+						acc +
+						`\n${i ? " " : figures.pointerSmall} ${kleur.red().italic(line)}`,
+					""
+				);
+		}
+
+		this.stdout.write(
+			erase.line +
+				cursor.to(0) +
+				this.outputText +
+				cursor.save +
+				this.outputError +
+				cursor.restore +
+				cursor.move(this.cursorOffset, 0)
+		);
+	}
 }
-
-module.exports = TextPrompt;
