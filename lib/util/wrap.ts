@@ -1,40 +1,43 @@
+type WrapOptions = {
+	margin?: number | string;
+	width: number;
+};
+
 /**
- * @param {string} message The message to wrap
- * @param {object} options
- * @param {number|string} [options.margin] Left margin
- * @param {number} options.width Maximum characters per line including the margin
+ * Wraps a message to a given width, applying a left margin.
+ * @param message The message to wrap
+ * @param options Options for wrapping
+ * @returns A formatted string with word wrapping and margin
  */
-export function wrap(
-  message: string,
-  options: { margin?: number | string; width: number }
-): string {
-  const { width, margin } = options;
+export function wrap(message: string, options: WrapOptions): string {
+	const { margin, width } = options;
 
-  let tab = "";
-  if (typeof margin === "number" && Number.isSafeInteger(margin)) {
-    tab = " ".repeat(margin);
-  } else if (typeof margin === "string") {
-    tab = margin;
-  }
+	const marginStr = String(margin || "");
+	const marginNum = parseInt(marginStr);
 
-  return (message || "")
-    .split(/\r?\n/g)
-    .map((line) =>
-      line
-        .split(/\s+/g)
-        .reduce(
-          (arr, w) => {
-            if (
-              w.length + tab.length >= width ||
-              arr[arr.length - 1].length + w.length + 1 < width
-            )
-              arr[arr.length - 1] += ` ${w}`;
-            else arr.push(`${tab}${w}`);
-            return arr;
-          },
-          [tab]
-        )
-        .join("\n")
-    )
-    .join("\n");
+	const tab = Number.isSafeInteger(marginNum)
+		? " ".repeat(marginNum)
+		: marginStr;
+
+	return (message || "")
+		.split(/\r?\n/g)
+		.map((line) => {
+			const words = line.split(/\s+/g);
+			const lines: string[] = [tab];
+
+			for (const word of words) {
+				const currentLine = lines[lines.length - 1];
+				const proposedLine =
+					currentLine + (currentLine.trim() ? " " : "") + word;
+
+				if (proposedLine.length > width) {
+					lines.push(tab + word);
+				} else {
+					lines[lines.length - 1] = proposedLine;
+				}
+			}
+
+			return lines.join("\n");
+		})
+		.join("\n");
 }
