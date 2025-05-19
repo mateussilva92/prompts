@@ -1,14 +1,28 @@
-const color = require("kleur");
-const Prompt = require("./prompt");
-const { cursor, erase } = require("sisteransi");
-const { style, figures, clear, lines } = require("../util");
+import kleur, { Kleur } from "kleur";
+import { Key } from "readline";
+import { cursor, erase } from "sisteransi";
+import { clear, delimiter, figures, lines, render, symbol } from "../util";
+import { Prompt, PromptOptions } from "./prompt";
 
 const isNumber = /[0-9]/;
-const isDef = (any) => any !== undefined;
-const round = (number, precision) => {
-  let factor = Math.pow(10, precision);
-  return Math.round(number * factor) / factor;
+const isDef = (val: unknown): boolean => val !== undefined;
+const round = (number: number, precision: number): number => {
+	let factor = Math.pow(10, precision);
+	return Math.round(number * factor) / factor;
 };
+
+export interface NumberPromptOptions extends PromptOptions {
+	message: string;
+	initial?: number;
+	min?: number;
+	max?: number;
+	float?: boolean;
+	round?: number;
+	increment?: number;
+	style?: string;
+	validate?: (val: number) => boolean | string | Promise<boolean | string>;
+	error?: string;
+}
 
 /**
  * NumberPrompt Base Element
@@ -26,204 +40,234 @@ const round = (number, precision) => {
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  * @param {String} [opts.error] The invalid error label
  */
-class NumberPrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.transform = style.render(opts.style);
-    this.msg = opts.message;
-    this.initial = isDef(opts.initial) ? opts.initial : "";
-    this.float = !!opts.float;
-    this.round = opts.round || 2;
-    this.inc = opts.increment || 1;
-    this.min = isDef(opts.min) ? opts.min : -Infinity;
-    this.max = isDef(opts.max) ? opts.max : Infinity;
-    this.errorMsg = opts.error || `Please Enter A Valid Value`;
-    this.validator = opts.validate || (() => true);
-    this.color = `cyan`;
-    this.value = ``;
-    this.typed = ``;
-    this.lastHit = 0;
-    this.render();
-  }
+export class NumberPrompt extends Prompt<number | ""> {
+	protected message: string;
+	protected initial: number | "";
+	protected float: boolean;
+	protected round: number;
+	protected inc: number;
+	protected min: number;
+	protected max: number;
+	protected errorMsg: string;
+	protected validator: (
+		val: number
+	) => boolean | string | Promise<boolean | string>;
+	protected color: keyof Kleur = "cyan";
+	protected placeholder: boolean = true;
+	protected rendered: string = "";
+	protected typed: string = "";
+	protected lastHit: number = 0;
+	protected transform: { render: (val: string) => string } = {
+		render: (v) => v,
+	};
+	protected outputError: string = "";
+	protected outputText: string = "";
+	protected done: boolean = false;
+	protected error: boolean = false;
 
-  set value(v) {
-    if (!v && v !== 0) {
-      this.placeholder = true;
-      this.rendered = color.gray(this.transform.render(`${this.initial}`));
-      this._value = ``;
-    } else {
-      this.placeholder = false;
-      this.rendered = this.transform.render(`${round(v, this.round)}`);
-      this._value = round(v, this.round);
-    }
-    this.fire();
-  }
+	constructor(options: NumberPromptOptions) {
+		super(options);
 
-  get value() {
-    return this._value;
-  }
+		this.transform = render(options.style || "default");
+		this.message = options.message;
+		this.initial = isDef(options.initial) ? options.initial! : "";
+		this.float = !!options.float;
+		this.round = options.round || 2; // TODO: Test and revisit this, could be ??
+		this.inc = options.increment || 1; // TODO: Test and revisit this, could be ??
+		this.min = isDef(options.min) ? options.min! : -Infinity;
+		this.max = isDef(options.max) ? options.max! : Infinity;
+		this.errorMsg = options.error || "Please Enter A Valid Value";
+		this.validator = options.validate || (() => true);
 
-  parse(x) {
-    return this.float ? parseFloat(x) : parseInt(x);
-  }
+		this.value = "";
+		this.render();
+	}
 
-  valid(c) {
-    return c === `-` || (c === `.` && this.float) || isNumber.test(c);
-  }
+	get value(): number | "" {
+		return this._value;
+	}
 
-  reset() {
-    this.typed = ``;
-    this.value = ``;
-    this.fire();
-    this.render();
-  }
+	set value(val: number | "") {
+		if (!val && val !== 0) {
+			this.placeholder = true;
+			this.rendered = kleur.gray(this.transform.render(`${this.initial}`));
+			this._value = "";
+		} else {
+			this.placeholder = false;
+			const roundVal = round(val, this.round);
 
-  exit() {
-    this.abort();
-  }
+			this.rendered = this.transform.render(`${roundVal}`);
+			this._value = roundVal;
+		}
+		this.fire();
+	}
 
-  abort() {
-    let x = this.value;
-    this.value = x !== `` ? x : this.initial;
-    this.done = this.aborted = true;
-    this.error = false;
-    this.fire();
-    this.render();
-    this.out.write(`\n`);
-    this.close();
-  }
+	parse(val: string): number {
+		return this.float ? parseFloat(val) : parseInt(val);
+	}
 
-  async validate() {
-    let valid = await this.validator(this.value);
-    if (typeof valid === `string`) {
-      this.errorMsg = valid;
-      valid = false;
-    }
-    this.error = !valid;
-  }
+	valid(char: string): boolean {
+		return char === "-" || (char === "." && this.float) || isNumber.test(char);
+	}
 
-  async submit() {
-    await this.validate();
-    if (this.error) {
-      this.color = `red`;
-      this.fire();
-      this.render();
-      return;
-    }
-    let x = this.value;
-    this.value = x !== `` ? x : this.initial;
-    this.done = true;
-    this.aborted = false;
-    this.error = false;
-    this.fire();
-    this.render();
-    this.out.write(`\n`);
-    this.close();
-  }
+	reset(): void {
+		this.typed = "";
+		this.value = "";
+		this.fire();
+		this.render();
+	}
 
-  up() {
-    this.typed = ``;
-    if (this.value === "") {
-      this.value = this.min === -Infinity ? 0 - this.inc : this.min - this.inc;
-    }
-    if (this.value >= this.max) return this.bell();
-    this.value += this.inc;
-    this.color = `cyan`;
-    this.fire();
-    this.render();
-  }
+	exit(): void {
+		this.abort();
+	}
 
-  down() {
-    this.typed = ``;
-    if (this.value === "") {
-      this.value = this.min === -Infinity ? 0 + this.inc : this.min + this.inc;
-    }
-    if (this.value <= this.min) return this.bell();
-    this.value -= this.inc;
-    this.color = `cyan`;
-    this.fire();
-    this.render();
-  }
+	abort(): void {
+		const val = this.value;
+		this.value = val !== "" ? val : this.initial;
+		this.done = this.aborted = true;
+		this.error = false;
+		this.fire();
+		this.render();
+		this.stdout.write(`\n`);
+		this.close();
+	}
 
-  delete() {
-    let val = this.value.toString();
-    if (val.length === 0) return this.bell();
-    this.value = this.parse((val = val.slice(0, -1))) || ``;
-    if (this.value !== "" && this.value < this.min) {
-      this.value = this.min === -Infinity ? 0 : this.min;
-    }
-    this.color = `cyan`;
-    this.fire();
-    this.render();
-  }
+	async validate(): Promise<void> {
+		let valid = await this.validator(this.value as number);
+		if (typeof valid === "string") {
+			this.errorMsg = valid;
+			valid = false;
+		}
+		this.error = !valid;
+	}
 
-  next() {
-    this.value = this.initial;
-    this.fire();
-    this.render();
-  }
+	async submit(): Promise<void> {
+		await this.validate();
+		if (this.error) {
+			this.color = "red";
+			this.fire();
+			this.render();
+			return;
+		}
+		const val = this.value;
+		this.value = val !== "" ? val : this.initial;
+		this.done = true;
+		this.aborted = false;
+		this.error = false;
+		this.fire();
+		this.render();
+		this.stdout.write("\n");
+		this.close();
+	}
 
-  _(c, key) {
-    if (!this.valid(c)) return this.bell();
+	up(): void {
+		this.typed = "";
+		if (this.value === "") {
+			this.value = this.min === -Infinity ? 0 - this.inc : this.min - this.inc;
+		}
+		if ((this.value as number) >= this.max) return this.bell();
+		this.value = (this.value as number) + this.inc;
+		this.color = "cyan";
+		this.fire();
+		this.render();
+	}
 
-    const now = Date.now();
-    if (now - this.lastHit > 1000) this.typed = ``; // 1s elapsed
-    this.typed += c;
-    this.lastHit = now;
-    this.color = `cyan`;
+	down(): void {
+		this.typed = "";
+		if (this.value === "") {
+			this.value = this.min === -Infinity ? 0 + this.inc : this.min + this.inc;
+		}
+		if ((this.value as number) <= this.min) return this.bell();
+		this.value = (this.value as number) - this.inc;
+		this.color = "cyan";
+		this.fire();
+		this.render();
+	}
 
-    if (c === `.`) return this.fire();
+	delete(): void {
+		let val = this.value.toString();
+		if (!val.length) return this.bell();
 
-    this.value = Math.min(this.parse(this.typed), this.max);
-    if (this.value > this.max) this.value = this.max;
-    if (this.value < this.min) this.value = this.min;
-    this.fire();
-    this.render();
-  }
+		const newVal = val.slice(0, -1);
+		this.value = this.parse(newVal) || "";
+		if (this.value !== "" && this.value < this.min) {
+			this.value = this.min === -Infinity ? 0 : this.min;
+		}
+		this.color = "cyan";
+		this.fire();
+		this.render();
+	}
 
-  render() {
-    if (this.closed) return;
-    if (!this.firstRender) {
-      if (this.outputError)
-        this.out.write(
-          cursor.down(lines(this.outputError, this.out.columns) - 1) +
-            clear(this.outputError, this.out.columns)
-        );
-      this.out.write(clear(this.outputText, this.out.columns));
-    }
-    super.render();
-    this.outputError = "";
+	next(): void {
+		this.value = this.initial;
+		this.fire();
+		this.render();
+	}
 
-    // Print prompt
-    this.outputText = [
-      style.symbol(this.done, this.aborted),
-      color.bold(this.msg),
-      style.delimiter(this.done),
-      !this.done || (!this.done && !this.placeholder)
-        ? color[this.color]().underline(this.rendered)
-        : this.rendered,
-    ].join(` `);
+	protected keyHandler(char: string, key: Key) {
+		if (!this.valid(char)) return this.bell();
 
-    // Print error
-    if (this.error) {
-      this.outputError += this.errorMsg
-        .split(`\n`)
-        .reduce(
-          (a, l, i) =>
-            a + `\n${i ? ` ` : figures.pointerSmall} ${color.red().italic(l)}`,
-          ``
-        );
-    }
+		const now = Date.now();
+		if (now - this.lastHit > 1000) this.typed = ""; // 1s elapsed
+		this.typed += char;
+		this.lastHit = now;
+		this.color = "cyan";
 
-    this.out.write(
-      erase.line +
-        cursor.to(0) +
-        this.outputText +
-        cursor.save +
-        this.outputError +
-        cursor.restore
-    );
-  }
+		if (char === ".") {
+			this.fire();
+			return;
+		}
+
+		const parsed = this.parse(this.typed);
+		// Make sure the value is in the range of min and max
+		this.value = Math.min(Math.max(parsed, this.min), this.max);
+		this.fire();
+		this.render();
+	}
+
+	render(): void {
+		if (this.closed) return;
+
+		if (!this.firstRender) {
+			if (this.outputError)
+				this.stdout.write(
+					cursor.down(lines(this.outputError, this.stdout.columns) - 1) +
+						clear(this.outputError, this.stdout.columns)
+				);
+			this.stdout.write(clear(this.outputText, this.stdout.columns));
+		}
+
+		super.render();
+		this.outputError = "";
+
+		this.outputText = [
+			symbol(this.done, this.aborted, false),
+			kleur.bold(this.message),
+			delimiter(this.done),
+			!this.done || (!this.done && !this.placeholder)
+				? kleur[this.color]().underline(this.rendered)
+				: this.rendered,
+		].join(" ");
+
+		// Print error
+		if (this.error) {
+			this.outputError += this.errorMsg
+				.split("\n")
+				.reduce(
+					(acc, line, i) =>
+						acc +
+						`\n${i ? " " : figures.pointerSmall} ${kleur.red().italic(line)}`,
+					""
+				);
+		}
+
+		this.stdout.write(
+			erase.line +
+				cursor.to(0) +
+				this.outputText +
+				cursor.save +
+				this.outputError +
+				cursor.restore
+		);
+	}
 }
-
-module.exports = NumberPrompt;

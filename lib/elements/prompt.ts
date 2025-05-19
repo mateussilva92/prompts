@@ -19,7 +19,7 @@ export class Prompt<T = unknown> extends EventEmitter {
 	protected stdout: WriteStream;
 	protected onRender: (kleur: Kleur) => void;
 
-	protected value?: T;
+	protected _value!: T; // Value should be set by subclasses
 
 	protected firstRender = true;
 	// TODO: Add doc for each prop bellow
@@ -55,6 +55,15 @@ export class Prompt<T = unknown> extends EventEmitter {
 		);
 
 		this.stdin.on("keypress", this.handleKeypress);
+	}
+
+	protected get value(): T {
+		return this._value;
+	}
+
+	protected set value(val: T) {
+		this._value = val;
+		this.fire();
 	}
 
 	/** Handle keypress events */
