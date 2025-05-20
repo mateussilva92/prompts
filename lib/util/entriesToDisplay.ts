@@ -11,11 +11,11 @@
 export function entriesToDisplay(
   cursor: number,
   total: number,
-  maxVisible: number = total
+  maxVisible: number = total,
 ): { startIndex: number; endIndex: number } {
   const startIndex = Math.max(
     0,
-    Math.min(total - maxVisible, cursor - Math.floor(maxVisible / 2))
+    Math.min(total - maxVisible, cursor - Math.floor(maxVisible / 2)),
   );
   const endIndex = Math.min(startIndex + maxVisible, total);
 
