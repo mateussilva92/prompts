@@ -1,16 +1,47 @@
-const color = require("kleur");
-const Prompt = require("./prompt");
-const { erase, cursor } = require("sisteransi");
-const { style, clear, figures, wrap, entriesToDisplay } = require("../util");
+import kleur from "kleur";
+import { Key } from "readline";
+import { cursor, erase } from "sisteransi";
+import { clear, entriesToDisplay, figures, render, wrap } from "../util";
+import { Prompt, PromptOptions } from "./prompt";
 
-const getVal = (arr, i) => arr[i] && (arr[i].value || arr[i].title || arr[i]);
-const getTitle = (arr, i) => arr[i] && (arr[i].title || arr[i].value || arr[i]);
-const getIndex = (arr, valOrTitle) => {
-  const index = arr.findIndex(
-    (el) => el.value === valOrTitle || el.title === valOrTitle
+export interface AutocompleteChoice {
+  title: string;
+  value: any;
+  description?: string;
+}
+
+export interface AutocompletePromptOptions extends PromptOptions {
+  message: string;
+  choices: (string | Partial<AutocompleteChoice>)[];
+  suggest: (
+    input: string,
+    choices: AutocompleteChoice[],
+  ) => Promise<AutocompleteChoice[]>;
+  limit?: number;
+  cursor?: number;
+  style?: string;
+  fallback?: string | number | AutocompleteChoice;
+  initial?: number | string;
+  clearFirst?: boolean;
+  noMatches?: string;
+}
+
+function getVal(items: any[], index: number) {
+  return (
+    items[index] && (items[index].value ?? items[index].title ?? items[index])
+  );
+}
+const getTitle = (items: any[], index: number) =>
+  items[index] && (items[index].title ?? items[index].value ?? items[index]);
+
+function getIndex(items: any[], valOrTitle: string | number | undefined) {
+  if (valOrTitle === undefined) return undefined;
+
+  const index = items.findIndex(
+    (item) => item.value === valOrTitle || item.title === valOrTitle,
   );
   return index > -1 ? index : undefined;
-};
+}
 
 /**
  * TextPrompt Base Element
@@ -28,78 +59,116 @@ const getIndex = (arr, valOrTitle) => {
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  * @param {String} [opts.noMatches] The no matches found label
  */
-class AutocompletePrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.msg = opts.message;
-    this.suggest = opts.suggest;
-    this.choices = opts.choices;
+
+export class AutocompletePrompt extends Prompt<any> {
+  protected message: string;
+  protected choices: AutocompleteChoice[] = [];
+  protected suggest: AutocompletePromptOptions["suggest"];
+  protected fallbackValue: string | number | AutocompleteChoice = "";
+  protected _fb: any;
+  protected clear: string;
+  protected input: string = "";
+  protected suggestions: AutocompleteChoice[] = [];
+  protected initial?: number;
+  protected select: number = 0;
+  protected limit: number = 10;
+  protected cursor: number = 0;
+  protected transform: ReturnType<typeof render>;
+  protected scale: number;
+  protected completing: Promise<any> | false = false;
+  protected i18n: { noMatches: string };
+  protected clearFirst: boolean;
+  protected rendered: string = "";
+
+  constructor(options: AutocompletePromptOptions) {
+    super(options);
+
+    this.message = options.message;
+    this.choices = options.choices;
+
+    this.suggest = options.suggest;
     this.initial =
-      typeof opts.initial === "number"
-        ? opts.initial
-        : getIndex(opts.choices, opts.initial);
-    this.select = this.initial || opts.cursor || 0;
-    this.i18n = { noMatches: opts.noMatches || "no matches found" };
-    this.fallback = opts.fallback || this.initial;
-    this.clearFirst = opts.clearFirst || false;
-    this.suggestions = [];
-    this.input = "";
-    this.limit = opts.limit || 10;
-    this.cursor = 0;
-    this.transform = style.render(opts.style);
+      typeof options.initial === "number"
+        ? options.initial
+        : getIndex(this.choices, options.initial);
+    this.select = this.initial ?? options.cursor ?? 0;
+    this.fallback = options.fallback ?? this.initial;
+    this.limit = options.limit || 10;
+    this.clearFirst = options.clearFirst ?? false;
+    this.i18n = { noMatches: options.noMatches ?? "no matches found" };
+    this.transform = render(options.style ?? "default");
     this.scale = this.transform.scale;
+
     this.render = this.render.bind(this);
     this.complete = this.complete.bind(this);
-    this.clear = clear("", this.out.columns);
+    this.clear = clear("", this.stdout.columns);
+
     this.complete(this.render);
     this.render();
   }
 
-  set fallback(fb) {
-    this._fb = Number.isSafeInteger(parseInt(fb)) ? parseInt(fb) : fb;
+  public set fallback(fb: string | number | AutocompleteChoice) {
+    const strFallback = String(fb);
+
+    this._fb = Number.isSafeInteger(parseInt(strFallback))
+      ? parseInt(strFallback)
+      : fb;
   }
 
-  get fallback() {
-    let choice;
-    if (typeof this._fb === "number") choice = this.choices[this._fb];
-    else if (typeof this._fb === "string") choice = { title: this._fb };
-    return choice || this._fb || { title: this.i18n.noMatches };
+  get fallback(): AutocompleteChoice {
+    switch (typeof this._fb) {
+      case "number":
+        return (
+          this.choices[this._fb] ?? { title: this.i18n.noMatches, value: null }
+        );
+
+      case "string":
+        return { title: this._fb, value: this._fb };
+
+      default:
+        return this._fb ?? { title: this.i18n.noMatches, value: null };
+    }
   }
 
-  moveSelect(i) {
-    this.select = i;
-    if (this.suggestions.length > 0) this.value = getVal(this.suggestions, i);
-    else this.value = this.fallback.value;
+  protected moveSelect(index: number): void {
+    this.select = index;
+    this.value =
+      this.suggestions.length > 0
+        ? getVal(this.suggestions, this.select)
+        : this.fallback.value;
     this.fire();
   }
 
-  async complete(cb) {
-    const p = (this.completing = this.suggest(this.input, this.choices));
-    const suggestions = await p;
+  protected async complete(callback?: () => void): Promise<void> {
+    const promise = (this.completing = this.suggest(this.input, this.choices));
+    const suggestions = await promise;
+    if (this.completing !== promise) return; // New promise is in progress so we can ignore this one
 
-    if (this.completing !== p) return;
-    this.suggestions = suggestions.map((s, i, arr) => ({
-      title: getTitle(arr, i),
-      value: getVal(arr, i),
-      description: s.description,
+    this.suggestions = suggestions.map((suggestion, index, items) => ({
+      title: getTitle(items, index),
+      value: getVal(items, index),
+      description: suggestion.description,
     }));
-    this.completing = false;
-    const l = Math.max(suggestions.length - 1, 0);
-    this.moveSelect(Math.min(l, this.select));
 
-    cb && cb();
+    this.completing = false;
+
+    // Get the select value on the range of the suggestions
+    const select = Math.min(Math.max(suggestions.length - 1, 0), this.select);
+    this.moveSelect(select);
+
+    callback?.();
   }
 
-  reset() {
+  public reset(): void {
     this.input = "";
     this.complete(() => {
-      this.moveSelect(this.initial !== void 0 ? this.initial : 0);
+      this.moveSelect(this.initial ?? 0);
       this.render();
     });
     this.render();
   }
 
-  exit() {
+  public exit(): void {
     if (this.clearFirst && this.input.length > 0) {
       this.reset();
     } else {
@@ -107,150 +176,152 @@ class AutocompletePrompt extends Prompt {
       this.aborted = false;
       this.fire();
       this.render();
-      this.out.write("\n");
+      this.stdout.write("\n");
       this.close();
     }
   }
 
-  abort() {
+  public abort(): void {
     this.done = this.aborted = true;
     this.exited = false;
     this.fire();
     this.render();
-    this.out.write("\n");
+    this.stdout.write("\n");
     this.close();
   }
 
-  submit() {
+  public submit(): void {
     this.done = true;
     this.aborted = this.exited = false;
     this.fire();
     this.render();
-    this.out.write("\n");
+    this.stdout.write("\n");
     this.close();
   }
 
-  _(c, key) {
-    let s1 = this.input.slice(0, this.cursor);
-    let s2 = this.input.slice(this.cursor);
-    this.input = `${s1}${c}${s2}`;
+  protected keyHandler(char: string, key: Key): void {
+    const s1 = this.input.slice(0, this.cursor);
+    const s2 = this.input.slice(this.cursor);
+    this.input = s1 + char + s2;
     this.cursor = s1.length + 1;
-    this.complete(this.render);
+    this.complete(this.render); //TODO: Check if we need to use this.complete(this.render.bind(this));
     this.render();
   }
 
-  delete() {
+  public delete(): void {
     if (this.cursor === 0) return this.bell();
-    let s1 = this.input.slice(0, this.cursor - 1);
-    let s2 = this.input.slice(this.cursor);
-    this.input = `${s1}${s2}`;
-    this.complete(this.render);
-    this.cursor = this.cursor - 1;
+    const s1 = this.input.slice(0, this.cursor - 1);
+    const s2 = this.input.slice(this.cursor);
+    this.input = s1 + s2;
+    this.cursor--;
+    this.complete(this.render); //TODO: Check if we need to use this.complete(this.render.bind(this));
     this.render();
   }
 
-  deleteForward() {
+  public deleteForward(): void {
     if (this.cursor * this.scale >= this.rendered.length) return this.bell();
-    let s1 = this.input.slice(0, this.cursor);
-    let s2 = this.input.slice(this.cursor + 1);
-    this.input = `${s1}${s2}`;
-    this.complete(this.render);
+    const s1 = this.input.slice(0, this.cursor);
+    const s2 = this.input.slice(this.cursor + 1);
+    this.input = s1 + s2;
+    this.complete(this.render); //TODO: Check if we need to use this.complete(this.render.bind(this));
     this.render();
   }
 
-  first() {
+  public first(): void {
     this.moveSelect(0);
     this.render();
   }
 
-  last() {
+  public last(): void {
     this.moveSelect(this.suggestions.length - 1);
     this.render();
   }
 
-  up() {
-    if (this.select === 0) {
-      this.moveSelect(this.suggestions.length - 1);
-    } else {
-      this.moveSelect(this.select - 1);
-    }
+  public up(): void {
+    const len = this.suggestions.length;
+    this.moveSelect(this.select === 0 ? len - 1 : this.select - 1);
     this.render();
   }
 
-  down() {
-    if (this.select === this.suggestions.length - 1) {
-      this.moveSelect(0);
-    } else {
-      this.moveSelect(this.select + 1);
-    }
+  public down(): void {
+    const len = this.suggestions.length;
+    this.moveSelect(this.select === len - 1 ? 0 : this.select + 1);
     this.render();
   }
 
-  next() {
-    if (this.select === this.suggestions.length - 1) {
-      this.moveSelect(0);
-    } else this.moveSelect(this.select + 1);
-    this.render();
+  public next(): void {
+    this.down();
   }
 
-  nextPage() {
-    this.moveSelect(
-      Math.min(this.select + this.limit, this.suggestions.length - 1)
+  public nextPage(): void {
+    const next = Math.min(
+      this.select + this.limit,
+      this.suggestions.length - 1,
     );
+    this.moveSelect(next);
     this.render();
   }
 
-  prevPage() {
-    this.moveSelect(Math.max(this.select - this.limit, 0));
+  public prevPage(): void {
+    const prev = Math.max(this.select - this.limit, 0);
+    this.moveSelect(prev);
     this.render();
   }
 
-  left() {
+  public left(): void {
     if (this.cursor <= 0) return this.bell();
-    this.cursor = this.cursor - 1;
+    this.cursor--;
     this.render();
   }
 
-  right() {
+  public right(): void {
     if (this.cursor * this.scale >= this.rendered.length) return this.bell();
-    this.cursor = this.cursor + 1;
+    this.cursor++;
     this.render();
   }
 
-  renderOption(v, hovered, isStart, isEnd) {
-    let desc;
+  protected renderOption(
+    value: AutocompleteChoice,
+    hovered: boolean,
+    isStart: boolean,
+    isEnd: boolean,
+  ): string {
+    let desc = "";
     let prefix = isStart ? figures.arrowUp : isEnd ? figures.arrowDown : " ";
-    let title = hovered ? color.cyan().underline(v.title) : v.title;
-    prefix = (hovered ? color.cyan(figures.pointer) + " " : "  ") + prefix;
-    if (v.description) {
-      desc = ` - ${v.description}`;
+    let title = hovered ? kleur.cyan().underline(value.title) : value.title;
+    prefix = (hovered ? kleur.cyan(figures.pointer) + " " : "  ") + prefix;
+
+    if (value.description) {
+      desc = ` - ${value.description}`;
       if (
-        prefix.length + title.length + desc.length >= this.out.columns ||
-        v.description.split(/\r?\n/).length > 1
+        prefix.length + title.length + desc.length >= this.stdout.columns ||
+        value.description.includes("\n")
       ) {
         desc =
-          "\n" + wrap(v.description, { margin: 3, width: this.out.columns });
+          "\n" +
+          wrap(value.description, { margin: 3, width: this.stdout.columns });
       }
     }
-    return prefix + " " + title + color.gray(desc || "");
+    return `${prefix} ${title}${kleur.gray(desc)}`;
   }
 
-  render() {
+  public render(): void {
     if (this.closed) return;
-    if (this.firstRender) this.out.write(cursor.hide);
-    else this.out.write(clear(this.outputText, this.out.columns));
+
+    if (this.firstRender) this.stdout.write(cursor.hide);
+    else this.stdout.write(clear(this.outputText, this.stdout.columns));
     super.render();
 
-    let { startIndex, endIndex } = entriesToDisplay(
+    const { startIndex, endIndex } = entriesToDisplay(
       this.select,
       this.choices.length,
-      this.limit
+      this.limit,
     );
 
     this.outputText = [
       style.symbol(this.done, this.aborted, this.exited),
-      color.bold(this.msg),
-      style.delimiter(this.completing),
+      kleur.bold(this.message),
+      style.delimiter(Boolean(this.completing)),
       this.done && this.suggestions[this.select]
         ? this.suggestions[this.select].title
         : (this.rendered = this.transform.render(this.input)),
@@ -259,21 +330,20 @@ class AutocompletePrompt extends Prompt {
     if (!this.done) {
       const suggestions = this.suggestions
         .slice(startIndex, endIndex)
-        .map((item, i) =>
+        .map((item, index) =>
           this.renderOption(
             item,
-            this.select === i + startIndex,
-            i === 0 && startIndex > 0,
-            i + startIndex === endIndex - 1 && endIndex < this.choices.length
-          )
+            this.select === index + startIndex,
+            index === 0 && startIndex > 0,
+            index + startIndex === endIndex - 1 &&
+              endIndex < this.choices.length,
+          ),
         )
         .join("\n");
       this.outputText +=
-        `\n` + (suggestions || color.gray(this.fallback.title));
+        `\n` + (suggestions || kleur.gray(this.fallback.title));
     }
 
-    this.out.write(erase.line + cursor.to(0) + this.outputText);
+    this.stdout.write(erase.line + cursor.to(0) + this.outputText);
   }
 }
-
-module.exports = AutocompletePrompt;
