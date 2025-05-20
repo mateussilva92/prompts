@@ -1,7 +1,32 @@
-const color = require("kleur");
-const Prompt = require("./prompt");
-const { style, clear, figures, wrap, entriesToDisplay } = require("../util");
-const { cursor } = require("sisteransi");
+import kleur from "kleur";
+import { Key } from "readline";
+import { cursor } from "sisteransi";
+import {
+  clear,
+  delimiter,
+  entriesToDisplay,
+  figures,
+  symbol,
+  wrap,
+} from "../util";
+import { Prompt, PromptOptions } from "./prompt";
+
+export interface SelectChoice {
+  title: string;
+  value: any;
+  description?: string;
+  disabled?: boolean;
+  selected?: boolean;
+}
+
+export interface SelectPromptOptions extends PromptOptions {
+  message: string;
+  hint?: string;
+  warn?: string;
+  initial?: number;
+  choices: (string | Partial<SelectChoice>)[];
+  optionsPerPage?: number;
+}
 
 /**
  * SelectPrompt Base Element
@@ -14,180 +39,198 @@ const { cursor } = require("sisteransi");
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  * @param {Number} [opts.optionsPerPage=10] Max options to display at once
  */
-class SelectPrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.msg = opts.message;
-    this.hint = opts.hint || "- Use arrow-keys. Return to submit.";
-    this.warn = opts.warn || "- This option is disabled";
-    this.cursor = opts.initial || 0;
-    this.choices = opts.choices.map((ch, idx) => {
-      if (typeof ch === "string") ch = { title: ch, value: idx };
+export class SelectPrompt extends Prompt {
+  protected message: string;
+  protected hint: string;
+  protected warn: string;
+  protected clear: string;
+  protected cursor: number = 0;
+  protected choices: SelectChoice[] = [];
+  protected optionsPerPage: number = 10;
+  protected outputText: string = "";
+
+  constructor(options: SelectPromptOptions) {
+    super(options);
+
+    this.message = options.message;
+    this.hint = options.hint ?? "- Use arrow-keys. Return to submit.";
+    this.warn = options.warn ?? "- This option is disabled";
+    this.cursor = options.initial ?? 0;
+    this.choices = options.choices.map((choice, index) => {
+      if (typeof choice === "string") {
+        return { title: choice, value: index };
+      }
+
       return {
-        title: ch && (ch.title || ch.value || ch),
-        value: ch && (ch.value === undefined ? idx : ch.value),
-        description: ch && ch.description,
-        selected: ch && ch.selected,
-        disabled: ch && ch.disabled,
+        title: choice.title ?? String(choice.value ?? index),
+        value: choice.value ?? index,
+        description: choice.description,
+        selected: choice.selected,
+        disabled: choice.disabled,
       };
     });
-    this.optionsPerPage = opts.optionsPerPage || 10;
-    this.value = (this.choices[this.cursor] || {}).value;
-    this.clear = clear("", this.out.columns);
+
+    this.optionsPerPage = options.optionsPerPage ?? 10;
+    this.value = this.choices[this.cursor]?.value;
+    this.clear = clear("", this.stdout.columns);
+
     this.render();
   }
 
-  moveCursor(n) {
-    this.cursor = n;
-    this.value = this.choices[n].value;
+  protected moveCursor(num: number): void {
+    this.cursor = num;
+    this.value = this.choices[num].value;
     this.fire();
   }
 
-  reset() {
+  public reset(): void {
     this.moveCursor(0);
     this.fire();
     this.render();
   }
 
-  exit() {
+  public exit(): void {
     this.abort();
   }
 
-  abort() {
+  public abort(): void {
     this.done = this.aborted = true;
     this.fire();
     this.render();
-    this.out.write("\n");
+    this.stdout.write("\n");
     this.close();
   }
 
-  submit() {
+  public submit(): void {
     if (!this.selection.disabled) {
       this.done = true;
       this.aborted = false;
       this.fire();
       this.render();
-      this.out.write("\n");
+      this.stdout.write("\n");
       this.close();
-    } else this.bell();
+    } else {
+      this.bell();
+    }
   }
 
-  first() {
+  public first(): void {
     this.moveCursor(0);
     this.render();
   }
 
-  last() {
+  public last(): void {
     this.moveCursor(this.choices.length - 1);
     this.render();
   }
 
-  up() {
-    if (this.cursor === 0) {
-      this.moveCursor(this.choices.length - 1);
-    } else {
-      this.moveCursor(this.cursor - 1);
-    }
+  public up(): void {
+    const len = this.choices.length;
+    this.moveCursor((this.cursor - 1 + len) % len); // Wrap around
     this.render();
   }
 
-  down() {
-    if (this.cursor === this.choices.length - 1) {
-      this.moveCursor(0);
-    } else {
-      this.moveCursor(this.cursor + 1);
-    }
+  public down(): void {
+    const len = this.choices.length;
+    this.moveCursor((this.cursor + 1) % len); // Wrap around
     this.render();
   }
 
-  next() {
-    this.moveCursor((this.cursor + 1) % this.choices.length);
-    this.render();
+  public next(): void {
+    this.down();
   }
 
-  _(c, key) {
-    if (c === " ") return this.submit();
+  protected keyHandler(char: string, key: Key): void {
+    if (char === " ") this.submit();
   }
 
-  get selection() {
+  protected get selection(): SelectChoice {
     return this.choices[this.cursor];
   }
 
   render() {
     if (this.closed) return;
-    if (this.firstRender) this.out.write(cursor.hide);
-    else this.out.write(clear(this.outputText, this.out.columns));
+
+    if (this.firstRender) {
+      this.stdout.write(cursor.hide);
+    } else {
+      this.stdout.write(clear(this.outputText, this.stdout.columns));
+    }
     super.render();
 
-    let { startIndex, endIndex } = entriesToDisplay(
+    const { startIndex, endIndex } = entriesToDisplay(
       this.cursor,
       this.choices.length,
-      this.optionsPerPage
+      this.optionsPerPage,
     );
 
-    // Print prompt
     this.outputText = [
-      style.symbol(this.done, this.aborted),
-      color.bold(this.msg),
-      style.delimiter(false),
+      symbol(this.done, this.aborted, false),
+      kleur.bold(this.message),
+      delimiter(false),
       this.done
         ? this.selection.title
         : this.selection.disabled
-        ? color.yellow(this.warn)
-        : color.gray(this.hint),
+          ? kleur.yellow(this.warn)
+          : kleur.gray(this.hint),
     ].join(" ");
 
     // Print choices
     if (!this.done) {
       this.outputText += "\n";
       for (let i = startIndex; i < endIndex; i++) {
-        let title,
-          prefix,
-          desc = "",
-          v = this.choices[i];
+        const choice = this.choices[i];
+        let prefix = " ";
+        let title: string;
+        let desc = "";
 
         // Determine whether to display "more choices" indicators
         if (i === startIndex && startIndex > 0) {
           prefix = figures.arrowUp;
         } else if (i === endIndex - 1 && endIndex < this.choices.length) {
           prefix = figures.arrowDown;
-        } else {
-          prefix = " ";
         }
 
-        if (v.disabled) {
+        if (choice.disabled) {
           title =
             this.cursor === i
-              ? color.gray().underline(v.title)
-              : color.strikethrough().gray(v.title);
+              ? kleur.gray().underline(choice.title)
+              : kleur.strikethrough().gray(choice.title);
           prefix =
-            (this.cursor === i
-              ? color.bold().gray(figures.pointer) + " "
-              : "  ") + prefix;
+            this.cursor === i
+              ? kleur.bold().gray(figures.pointer) + " " + prefix
+              : "  " + prefix;
         } else {
-          title = this.cursor === i ? color.cyan().underline(v.title) : v.title;
+          title =
+            this.cursor === i
+              ? kleur.cyan().underline(choice.title)
+              : choice.title;
           prefix =
-            (this.cursor === i ? color.cyan(figures.pointer) + " " : "  ") +
-            prefix;
-          if (v.description && this.cursor === i) {
-            desc = ` - ${v.description}`;
+            this.cursor === i
+              ? kleur.cyan(figures.pointer) + " " + prefix
+              : "  " + prefix;
+
+          if (choice.description && this.cursor === i) {
+            desc = ` - ${choice.description}`;
             if (
-              prefix.length + title.length + desc.length >= this.out.columns ||
-              v.description.split(/\r?\n/).length > 1
+              prefix.length + title.length + desc.length >=
+                this.stdout.columns ||
+              choice.description.includes("\n")
             ) {
               desc =
                 "\n" +
-                wrap(v.description, { margin: 3, width: this.out.columns });
+                wrap(choice.description, {
+                  margin: 3,
+                  width: this.stdout.columns,
+                });
             }
           }
         }
 
-        this.outputText += `${prefix} ${title}${color.gray(desc)}\n`;
+        this.outputText += `${prefix} ${title}${kleur.gray(desc)}\n`;
       }
     }
 
-    this.out.write(this.outputText);
+    this.stdout.write(this.outputText);
   }
 }
-
-module.exports = SelectPrompt;
