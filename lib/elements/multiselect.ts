@@ -1,7 +1,35 @@
-const color = require("kleur");
-const { cursor } = require("sisteransi");
-const Prompt = require("./prompt");
-const { clear, figures, style, wrap, entriesToDisplay } = require("../util");
+import kleur from "kleur";
+import { cursor } from "sisteransi";
+import {
+  clear,
+  delimiter,
+  entriesToDisplay,
+  figures,
+  symbol,
+  wrap,
+} from "../util";
+import { Prompt, PromptOptions } from "./prompt";
+
+export interface MultiselectChoice {
+  title: string;
+  value: any;
+  description?: string;
+  selected?: boolean;
+  disabled?: boolean;
+}
+
+export interface MultiselectPromptOptions extends PromptOptions {
+  message: string;
+  choices: (string | Partial<MultiselectChoice>)[];
+  hint?: string;
+  warn?: string;
+  max?: number;
+  min?: number;
+  cursor?: number;
+  instructions?: boolean | string;
+  optionsPerPage?: number;
+  overrideRender?: boolean;
+}
 
 /**
  * MultiselectPrompt Base Element
@@ -16,60 +44,83 @@ const { clear, figures, style, wrap, entriesToDisplay } = require("../util");
  * @param {Stream} [opts.stdin] The Readable stream to listen to
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  */
-class MultiselectPrompt extends Prompt {
-  constructor(opts = {}) {
-    super(opts);
-    this.msg = opts.message;
-    this.cursor = opts.cursor || 0;
-    this.scrollIndex = opts.cursor || 0;
-    this.hint = opts.hint || "";
-    this.warn = opts.warn || "- This option is disabled -";
-    this.minSelected = opts.min;
-    this.showMinError = false;
-    this.maxChoices = opts.max;
-    this.instructions = opts.instructions;
-    this.optionsPerPage = opts.optionsPerPage || 10;
-    this.value = opts.choices.map((ch, idx) => {
-      if (typeof ch === "string") ch = { title: ch, value: idx };
+export class MultiselectPrompt extends Prompt<MultiselectChoice[]> {
+  protected message: string;
+  protected hint: string;
+  protected warn: string;
+  protected clear: string;
+  protected minSelected?: number;
+  protected maxChoices?: number;
+  protected cursor: number = 0;
+  protected scrollIndex: number = 0;
+  protected optionsPerPage: number = 10;
+  protected instructions?: boolean | string;
+  protected showMinError: boolean = false;
+
+  constructor(options: MultiselectPromptOptions) {
+    super(options);
+
+    this.message = options.message;
+    this.cursor = options.cursor ?? 0;
+    this.scrollIndex = this.cursor;
+    this.hint = options.hint ?? "";
+    this.warn = options.warn ?? "- This option is disabled -";
+    this.minSelected = options.min;
+    this.maxChoices = options.max;
+    this.instructions = options.instructions;
+    this.optionsPerPage = options.optionsPerPage ?? 10;
+
+    this.value = options.choices.map((choice, index) => {
+      if (typeof choice === "string") {
+        return { title: choice, value: index };
+      }
+
       return {
-        title: ch && (ch.title || ch.value || ch),
-        description: ch && ch.description,
-        value: ch && (ch.value === undefined ? idx : ch.value),
-        selected: ch && ch.selected,
-        disabled: ch && ch.disabled,
+        title: choice.title ?? String(choice.value ?? index),
+        value: choice.value ?? index,
+        description: choice.description,
+        selected: choice.selected,
+        disabled: choice.disabled,
       };
     });
-    this.clear = clear("", this.out.columns);
-    if (!opts.overrideRender) {
-      this.render();
-    }
+
+    this.clear = clear("", this.stdout.columns);
+    if (!options.overrideRender) this.render();
   }
 
-  reset() {
-    this.value.map((v) => !v.selected);
+  protected get value(): MultiselectChoice[] {
+    return this._value;
+  }
+  protected set value(value: MultiselectChoice[]) {
+    this._value = value;
+  }
+
+  // BUG FIXED: Reset never reseted the options
+  public reset(): void {
+    this.value.forEach((val) => (val.selected = false));
     this.cursor = 0;
     this.fire();
     this.render();
   }
 
-  selected() {
-    return this.value.filter((v) => v.selected);
+  public selected(): MultiselectChoice[] {
+    return this.value.filter((val) => val.selected);
   }
 
-  exit() {
+  public exit(): void {
     this.abort();
   }
 
-  abort() {
+  public abort(): void {
     this.done = this.aborted = true;
     this.fire();
     this.render();
-    this.out.write("\n");
+    this.stdout.write("\n");
     this.close();
   }
 
-  submit() {
-    const selected = this.value.filter((e) => e.selected);
+  public submit(): void {
+    const selected = this.value.filter((val) => val.selected);
     if (this.minSelected && selected.length < this.minSelected) {
       this.showMinError = true;
       this.render();
@@ -78,99 +129,104 @@ class MultiselectPrompt extends Prompt {
       this.aborted = false;
       this.fire();
       this.render();
-      this.out.write("\n");
+      this.stdout.write("\n");
       this.close();
     }
   }
 
-  first() {
+  public first(): void {
     this.cursor = 0;
     this.render();
   }
 
-  last() {
+  public last(): void {
     this.cursor = this.value.length - 1;
     this.render();
   }
-  next() {
+
+  public next(): void {
     this.cursor = (this.cursor + 1) % this.value.length;
     this.render();
   }
 
-  up() {
-    if (this.cursor === 0) {
-      this.cursor = this.value.length - 1;
-    } else {
-      this.cursor--;
-    }
+  public up(): void {
+    this.cursor = this.cursor === 0 ? this.value.length - 1 : this.cursor - 1;
     this.render();
   }
 
-  down() {
-    if (this.cursor === this.value.length - 1) {
-      this.cursor = 0;
-    } else {
-      this.cursor++;
-    }
+  public down(): void {
+    this.cursor = this.cursor === this.value.length - 1 ? 0 : this.cursor + 1;
     this.render();
   }
 
-  left() {
+  public left(): void {
     this.value[this.cursor].selected = false;
     this.render();
   }
 
-  right() {
-    if (this.value.filter((e) => e.selected).length >= this.maxChoices)
+  public right(): void {
+    if (
+      this.maxChoices !== undefined &&
+      this.value.filter((val) => val.selected).length >= this.maxChoices
+    ) {
       return this.bell();
+    }
+
     this.value[this.cursor].selected = true;
     this.render();
   }
 
-  handleSpaceToggle() {
-    const v = this.value[this.cursor];
+  protected handleSpaceToggle(): void {
+    const value = this.value[this.cursor];
 
-    if (v.selected) {
-      v.selected = false;
-      this.render();
-    } else if (
-      v.disabled ||
-      this.value.filter((e) => e.selected).length >= this.maxChoices
+    // BUG FIXED: Allowed to deselect select disabled options
+    // Probably disabled options should even have the state as selected
+    if (
+      value.disabled ||
+      (this.maxChoices &&
+        !value &&
+        this.value.filter((val) => val.selected).length >= this.maxChoices)
     ) {
       return this.bell();
-    } else {
-      v.selected = true;
-      this.render();
     }
+
+    value.selected = !value.selected;
+    this.render();
   }
 
-  toggleAll() {
-    if (this.maxChoices !== undefined || this.value[this.cursor].disabled) {
+  protected toggleAll(): void {
+    const value = this.value[this.cursor];
+
+    // TODO: Max choices shouldn't prevent toggling all in case there is less then max
+    if (this.maxChoices !== undefined || value.disabled) {
       return this.bell();
     }
 
-    const newSelected = !this.value[this.cursor].selected;
+    const newSelected = !value.selected;
     this.value
       .filter((v) => !v.disabled)
       .forEach((v) => (v.selected = newSelected));
     this.render();
   }
 
-  _(c, key) {
-    if (c === " ") {
-      this.handleSpaceToggle();
-    } else if (c === "a") {
-      this.toggleAll();
-    } else {
-      return this.bell();
+  protected _(char: string): void {
+    switch (char) {
+      case " ":
+        this.handleSpaceToggle();
+        break;
+
+      case "a":
+        this.toggleAll();
+        break;
+
+      default:
+        this.bell();
+        break;
     }
   }
 
-  renderInstructions() {
-    if (this.instructions === undefined || this.instructions) {
-      if (typeof this.instructions === "string") {
-        return this.instructions;
-      }
+  protected renderInstructions(): string {
+    if (this.instructions === undefined || this.instructions === true) {
       return (
         "\nInstructions:\n" +
         `    ${figures.arrowUp}/${figures.arrowDown}: Highlight option\n` +
@@ -179,118 +235,126 @@ class MultiselectPrompt extends Prompt {
         `    enter/return: Complete answer`
       );
     }
-    return "";
+
+    return typeof this.instructions === "string" ? this.instructions : "";
   }
 
-  renderOption(cursor, v, i, arrowIndicator) {
+  protected renderOption(
+    cursor: number,
+    value: MultiselectChoice,
+    index: number,
+    arrowIndicator: string,
+  ): string {
     const prefix =
-      (v.selected ? color.green(figures.radioOn) : figures.radioOff) +
+      (value.selected ? kleur.green(figures.radioOn) : figures.radioOff) +
       " " +
       arrowIndicator +
       " ";
-    let title, desc;
 
-    if (v.disabled) {
+    let title: string;
+    let desc: string = "";
+
+    if (value.disabled) {
       title =
-        cursor === i
-          ? color.gray().underline(v.title)
-          : color.strikethrough().gray(v.title);
+        cursor === index
+          ? kleur.gray().underline(value.title)
+          : kleur.strikethrough().gray(value.title);
     } else {
-      title = cursor === i ? color.cyan().underline(v.title) : v.title;
-      if (cursor === i && v.description) {
-        desc = ` - ${v.description}`;
+      title =
+        cursor === index ? kleur.cyan().underline(value.title) : value.title;
+
+      if (cursor === index && value.description) {
+        desc = ` - ${value.description}`;
         if (
-          prefix.length + title.length + desc.length >= this.out.columns ||
-          v.description.split(/\r?\n/).length > 1
+          prefix.length + title.length + desc.length >= this.stdout.columns ||
+          value.description.includes("\n")
         ) {
           desc =
             "\n" +
-            wrap(v.description, {
+            wrap(value.description, {
               margin: prefix.length,
-              width: this.out.columns,
+              width: this.stdout.columns,
             });
         }
       }
     }
 
-    return prefix + title + color.gray(desc || "");
+    return prefix + title + kleur.gray(desc);
   }
 
   // shared with autocompleteMultiselect
-  paginateOptions(options) {
+  protected paginateOptions(options: MultiselectChoice[]): string {
     if (options.length === 0) {
-      return color.red("No matches for this query.");
+      return kleur.red("No matches for this query.");
     }
 
-    let { startIndex, endIndex } = entriesToDisplay(
+    const { startIndex, endIndex } = entriesToDisplay(
       this.cursor,
       options.length,
-      this.optionsPerPage
+      this.optionsPerPage,
     );
-    let prefix,
-      styledOptions = [];
+
+    let arrow;
+    const lines: string[] = [];
 
     for (let i = startIndex; i < endIndex; i++) {
       if (i === startIndex && startIndex > 0) {
-        prefix = figures.arrowUp;
+        arrow = figures.arrowUp;
       } else if (i === endIndex - 1 && endIndex < options.length) {
-        prefix = figures.arrowDown;
+        arrow = figures.arrowDown;
       } else {
-        prefix = " ";
+        arrow = " ";
       }
-      styledOptions.push(this.renderOption(this.cursor, options[i], i, prefix));
+      lines.push(this.renderOption(this.cursor, options[i], i, arrow));
     }
 
-    return "\n" + styledOptions.join("\n");
+    return "\n" + lines.join("\n");
   }
 
   // shared with autocomleteMultiselect
-  renderOptions(options) {
-    if (!this.done) {
-      return this.paginateOptions(options);
-    }
-    return "";
+  protected renderOptions(options: MultiselectChoice[]): string {
+    return this.done ? "" : this.paginateOptions(options);
   }
 
-  renderDoneOrInstructions() {
+  protected renderDoneOrInstructions(): string {
     if (this.done) {
       return this.value
-        .filter((e) => e.selected)
-        .map((v) => v.title)
+        .filter((val) => val.selected)
+        .map((val) => val.title)
         .join(", ");
     }
 
-    const output = [color.gray(this.hint), this.renderInstructions()];
-
+    const output = [kleur.gray(this.hint), this.renderInstructions()];
     if (this.value[this.cursor].disabled) {
-      output.push(color.yellow(this.warn));
+      output.push(kleur.yellow(this.warn));
     }
     return output.join(" ");
   }
 
-  render() {
+  public render(): void {
     if (this.closed) return;
-    if (this.firstRender) this.out.write(cursor.hide);
+
+    if (this.firstRender) this.stdout.write(cursor.hide);
+
     super.render();
 
     // print prompt
     let prompt = [
-      style.symbol(this.done, this.aborted),
-      color.bold(this.msg),
-      style.delimiter(false),
+      symbol(this.done, this.aborted, false),
+      kleur.bold(this.message),
+      delimiter(false),
       this.renderDoneOrInstructions(),
     ].join(" ");
+
     if (this.showMinError) {
-      prompt += color.red(
-        `You must select a minimum of ${this.minSelected} choices.`
+      prompt += kleur.red(
+        `You must select a minimum of ${this.minSelected} choices.`,
       );
       this.showMinError = false;
     }
     prompt += this.renderOptions(this.value);
 
-    this.out.write(this.clear + prompt);
-    this.clear = clear(prompt, this.out.columns);
+    this.stdout.write(this.clear + prompt);
+    this.clear = clear(prompt, this.stdout.columns);
   }
 }
-
-module.exports = MultiselectPrompt;
