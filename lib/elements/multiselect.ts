@@ -180,11 +180,11 @@ export class MultiselectPrompt extends Prompt<MultiselectChoice[]> {
     const value = this.value[this.cursor];
 
     // BUG FIXED: Allowed to deselect select disabled options
-    // Probably disabled options should even have the state as selected
+    // Probably disabled options shouldn't even have the state as selected
     if (
       value.disabled ||
       (this.maxChoices &&
-        !value &&
+        !value.selected &&
         this.value.filter((val) => val.selected).length >= this.maxChoices)
     ) {
       return this.bell();
