@@ -1,10 +1,6 @@
 import { DatePart } from "./datepart";
 
 export class Year extends DatePart {
-  constructor(opts = {}) {
-    super(opts);
-  }
-
   up() {
     this.date.setFullYear(this.date.getFullYear() + 1);
   }

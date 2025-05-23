@@ -1,10 +1,6 @@
 import { DatePart } from "./datepart";
 
 export class Month extends DatePart {
-  constructor(opts = {}) {
-    super(opts);
-  }
-
   up() {
     this.date.setMonth(this.date.getMonth() + 1);
   }

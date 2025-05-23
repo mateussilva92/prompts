@@ -3,6 +3,7 @@ import { Key } from "readline";
 import { cursor, erase } from "sisteransi";
 import {
   DatePart,
+  DatePartOptions,
   Day,
   Hours,
   Meridiem,
@@ -15,7 +16,7 @@ import {
 import { clear, delimiter, figures, symbol } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-type LocaleData = {
+export type LocaleData = {
   months: string[];
   monthsShort: string[];
   weekdays: string[];
@@ -45,7 +46,10 @@ const defaultLocales: LocaleData = {
 const regex =
   /\\(.)|"((?:\\["\\]|[^"])+)"|(D[Do]?|d{3,4}|d)|(M{1,4})|(YY(?:YY)?)|([aA])|([Hh]{1,2})|(m{1,2})|(s{1,2})|(S{1,4})|./g;
 
-const regexGroups: Record<number, (options: any) => DatePart | string> = {
+const regexGroups: Record<
+  number,
+  (options: DatePartOptions) => DatePart | string
+> = {
   1: ({ token }) => token.replace(/\\(.)/g, "$1"),
   2: (options) => new Day(options), // Day // TODO
   3: (options) => new Month(options), // Month

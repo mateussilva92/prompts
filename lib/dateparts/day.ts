@@ -21,10 +21,6 @@ const getOrdinalSuffix = (n: number): string => {
 };
 
 export class Day extends DatePart {
-  constructor(opts = {}) {
-    super(opts);
-  }
-
   up() {
     this.date.setDate(this.date.getDate() + 1);
   }

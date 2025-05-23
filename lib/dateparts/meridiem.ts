@@ -1,10 +1,6 @@
 import { DatePart } from "./datepart";
 
 export class Meridiem extends DatePart {
-  constructor(opts = {}) {
-    super(opts);
-  }
-
   up() {
     this.date.setHours((this.date.getHours() + 12) % 24);
   }

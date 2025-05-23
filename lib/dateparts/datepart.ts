@@ -1,21 +1,23 @@
-type DatePartOptions = {
+import { LocaleData } from "../elements/date";
+
+export type DatePartOptions = {
   token: string;
   date?: Date;
-  parts?: DatePart[];
-  locales?: Record<string, unknown>;
+  parts?: (DatePart | string)[];
+  locales: LocaleData;
 };
 
 export class DatePart {
   token: string;
   date: Date;
-  parts: DatePart[];
-  locales: Record<string, unknown>;
+  parts: (DatePart | string)[];
+  locales: LocaleData;
 
   constructor({ token, date, parts, locales }: DatePartOptions) {
     this.token = token;
     this.date = date || new Date();
     this.parts = parts || [this];
-    this.locales = locales || {};
+    this.locales = locales;
   }
 
   up() {}

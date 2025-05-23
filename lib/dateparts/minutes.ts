@@ -1,10 +1,6 @@
 import { DatePart } from "./datepart";
 
 export class Minutes extends DatePart {
-  constructor(opts = {}) {
-    super(opts);
-  }
-
   up() {
     this.date.setMinutes(this.date.getMinutes() + 1);
   }
