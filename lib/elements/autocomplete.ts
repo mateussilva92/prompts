@@ -1,7 +1,15 @@
 import kleur from "kleur";
 import { Key } from "readline";
 import { cursor, erase } from "sisteransi";
-import { clear, entriesToDisplay, figures, render, wrap } from "../util";
+import {
+  clear,
+  delimiter,
+  entriesToDisplay,
+  figures,
+  render,
+  symbol,
+  wrap,
+} from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
 export interface AutocompleteChoice {
@@ -319,9 +327,9 @@ export class AutocompletePrompt extends Prompt<any> {
     );
 
     this.outputText = [
-      style.symbol(this.done, this.aborted, this.exited),
+      symbol(this.done, this.aborted, this.exited),
       kleur.bold(this.message),
-      style.delimiter(Boolean(this.completing)),
+      delimiter(Boolean(this.completing)),
       this.done && this.suggestions[this.select]
         ? this.suggestions[this.select].title
         : (this.rendered = this.transform.render(this.input)),

@@ -4,7 +4,7 @@ import { cursor, erase } from "sisteransi";
 import { clear, delimiter, symbol } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-type TogglePromptOptions = PromptOptions & {
+export type TogglePromptOptions = PromptOptions & {
   message: string;
   initial: boolean;
   active?: string;

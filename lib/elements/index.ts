@@ -1,11 +1,9 @@
-module.exports = {
-  TextPrompt: require("./text"),
-  SelectPrompt: require("./select"),
-  TogglePrompt: require("./toggle"),
-  DatePrompt: require("./date"),
-  NumberPrompt: require("./number"),
-  MultiselectPrompt: require("./multiselect"),
-  AutocompletePrompt: require("./autocomplete"),
-  AutocompleteMultiselectPrompt: require("./autocompleteMultiselect"),
-  ConfirmPrompt: require("./confirm"),
-};
+export * from "./autocomplete";
+export * from "./autocompleteMultiselect";
+export * from "./confirm";
+export * from "./date";
+export * from "./multiselect";
+export * from "./number";
+export * from "./select";
+export * from "./text";
+export * from "./toggle";

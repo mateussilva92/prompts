@@ -4,7 +4,7 @@ import { cursor, erase } from "sisteransi";
 import { clear, delimiter, symbol } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-type ConfirmPromptOptions = PromptOptions & {
+export type ConfirmPromptOptions = PromptOptions & {
   message: string;
   initial: boolean;
   yes?: string;
