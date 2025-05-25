@@ -26,7 +26,7 @@ export interface TextPromptOptions extends PromptOptions {
 export class TextPrompt extends Prompt<string> {
   protected message: string;
   protected initial: string;
-  protected transform: ReturnType<typeof style.render>;
+  protected transform: ReturnType<typeof render>;
   protected scale: number;
   protected validator: NonNullable<TextPromptOptions["validate"]>;
   protected errorMsg: string;
@@ -239,9 +239,9 @@ export class TextPrompt extends Prompt<string> {
 
     this.outputText = [
       symbol(this.done, this.aborted, false),
-      color.bold(this.message),
+      kleur.bold(this.message),
       delimiter(this.done),
-      this.red ? color.red(this.rendered) : this.rendered,
+      this.red ? kleur.red(this.rendered) : this.rendered,
     ].join(" ");
 
     if (this.error) {
