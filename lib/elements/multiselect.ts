@@ -10,7 +10,7 @@ import {
 } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-export interface MultiselectChoice {
+export type MultiselectChoice = {
   title: string;
   value: any;
   description?: string;
@@ -18,8 +18,7 @@ export interface MultiselectChoice {
   disabled?: boolean;
 }
 
-export interface MultiselectPromptOptions extends PromptOptions {
-  message: string;
+export type MultiselectPromptOptions = PromptOptions & {
   choices: (string | Partial<MultiselectChoice>)[];
   hint?: string;
   warn?: string;
@@ -45,7 +44,6 @@ export interface MultiselectPromptOptions extends PromptOptions {
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  */
 export class MultiselectPrompt extends Prompt<MultiselectChoice[]> {
-  protected message: string;
   protected hint: string;
   protected warn: string;
   protected clear: string;
@@ -60,7 +58,6 @@ export class MultiselectPrompt extends Prompt<MultiselectChoice[]> {
   constructor(options: MultiselectPromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.cursor = options.cursor ?? 0;
     this.scrollIndex = this.cursor;
     this.hint = options.hint ?? "";

@@ -5,7 +5,6 @@ import { clear, delimiter, symbol } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
 export type TogglePromptOptions = PromptOptions & {
-  message: string;
   initial: boolean;
   active?: string;
   inactive?: string;
@@ -15,7 +14,6 @@ export type TogglePromptOptions = PromptOptions & {
  * A toggle prompt that switches between two states (on/off).
  */
 export class TogglePrompt extends Prompt<boolean> {
-  protected message: string;
   protected active: string;
   protected inactive: string;
   protected initialValue: boolean;
@@ -23,7 +21,6 @@ export class TogglePrompt extends Prompt<boolean> {
   constructor(options: TogglePromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.value = !!options.initial;
     this.active = options.active || "on";
     this.inactive = options.inactive || "off";

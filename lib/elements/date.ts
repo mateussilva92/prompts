@@ -22,8 +22,7 @@ export type LocaleData = {
   weekdays: string[];
   weekdaysShort: string[];
 };
-export interface DatePromptOptions extends PromptOptions {
-  message: string;
+export type DatePromptOptions = PromptOptions & {
   initial?: Date;
   mask?: string;
   locales?: Partial<LocaleData>;
@@ -74,7 +73,6 @@ const regexGroups: Record<
  * @param {Stream} [opts.stdout] The Writable stream to write readline data to
  */
 export class DatePrompt extends Prompt<Date> {
-  protected message: string;
   protected cursor: number = 0;
   protected clear: string;
   protected typed: string = "";
@@ -88,7 +86,6 @@ export class DatePrompt extends Prompt<Date> {
   constructor(options: DatePromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.locales = { ...defaultLocales, ...options.locales };
     this._date = options.initial ?? new Date();
     this.validator = options.validate || (() => true);

@@ -11,8 +11,7 @@ const round = (number: number, precision: number): number => {
   return Math.round(number * factor) / factor;
 };
 
-export interface NumberPromptOptions extends PromptOptions {
-  message: string;
+export type NumberPromptOptions = PromptOptions & {
   initial?: number;
   min?: number;
   max?: number;
@@ -41,7 +40,6 @@ export interface NumberPromptOptions extends PromptOptions {
  * @param {String} [opts.error] The invalid error label
  */
 export class NumberPrompt extends Prompt<number | ""> {
-  protected message: string;
   protected initial: number | "";
   protected float: boolean;
   protected round: number;
@@ -67,7 +65,6 @@ export class NumberPrompt extends Prompt<number | ""> {
     super(options);
 
     this.transform = render(options.style || "default");
-    this.message = options.message;
     this.initial = isDef(options.initial) ? options.initial! : "";
     this.float = !!options.float;
     this.round = options.round || 2; // TODO: Test and revisit this, could be ??

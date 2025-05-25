@@ -12,14 +12,13 @@ import {
 } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-export interface AutocompleteChoice {
+export type AutocompleteChoice = {
   title: string;
   value: any;
   description?: string;
 }
 
-export interface AutocompletePromptOptions extends PromptOptions {
-  message: string;
+export type AutocompletePromptOptions = PromptOptions & {
   choices: (string | Partial<AutocompleteChoice>)[];
   suggest: (
     input: string,
@@ -69,7 +68,6 @@ function getIndex(items: any[], valOrTitle: string | number | undefined) {
  */
 
 export class AutocompletePrompt extends Prompt<any> {
-  protected message: string;
   protected choices: AutocompleteChoice[] = [];
   protected suggest: AutocompletePromptOptions["suggest"];
   protected fallbackValue: string | number | AutocompleteChoice = "";
@@ -91,7 +89,6 @@ export class AutocompletePrompt extends Prompt<any> {
   constructor(options: AutocompletePromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.choices = options.choices;
 
     this.suggest = options.suggest;

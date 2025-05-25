@@ -11,7 +11,7 @@ import {
 } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-export interface SelectChoice {
+export type SelectChoice = {
   title: string;
   value: any;
   description?: string;
@@ -19,8 +19,7 @@ export interface SelectChoice {
   selected?: boolean;
 }
 
-export interface SelectPromptOptions extends PromptOptions {
-  message: string;
+export type SelectPromptOptions = PromptOptions & {
   hint?: string;
   warn?: string;
   initial?: number;
@@ -40,7 +39,6 @@ export interface SelectPromptOptions extends PromptOptions {
  * @param {Number} [opts.optionsPerPage=10] Max options to display at once
  */
 export class SelectPrompt extends Prompt {
-  protected message: string;
   protected hint: string;
   protected warn: string;
   protected clear: string;
@@ -52,7 +50,6 @@ export class SelectPrompt extends Prompt {
   constructor(options: SelectPromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.hint = options.hint ?? "- Use arrow-keys. Return to submit.";
     this.warn = options.warn ?? "- This option is disabled";
     this.cursor = options.initial ?? 0;

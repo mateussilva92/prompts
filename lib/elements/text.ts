@@ -4,8 +4,7 @@ import { cursor, erase } from "sisteransi";
 import { clear, delimiter, figures, lines, render, symbol } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
-export interface TextPromptOptions extends PromptOptions {
-  message: string;
+export type TextPromptOptions = PromptOptions & {
   style?: string;
   initial?: string;
   validate?: (value: string) => boolean | string | Promise<boolean | string>;
@@ -24,7 +23,6 @@ export interface TextPromptOptions extends PromptOptions {
  * @param {String} [opts.error] The invalid error label
  */
 export class TextPrompt extends Prompt<string> {
-  protected message: string;
   protected initial: string;
   protected transform: ReturnType<typeof render>;
   protected scale: number;
@@ -44,7 +42,6 @@ export class TextPrompt extends Prompt<string> {
   constructor(options: TextPromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.transform = render(options.style || "default");
     this.scale = this.transform.scale;
     this.initial = options.initial ?? "";

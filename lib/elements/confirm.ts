@@ -5,7 +5,6 @@ import { clear, delimiter, symbol } from "../util";
 import { Prompt, PromptOptions } from "./prompt";
 
 export type ConfirmPromptOptions = PromptOptions & {
-  message: string;
   initial: boolean;
   yes?: string;
   yesOption?: string;
@@ -26,7 +25,6 @@ export type ConfirmPromptOptions = PromptOptions & {
  * @param {String} [opts.noOption] The "No" option when choosing between yes/no
  */
 export class ConfirmPrompt extends Prompt<boolean> {
-  protected message: string;
   protected yesMessage: string;
   protected yesOption: string;
   protected noMessage: string;
@@ -36,7 +34,6 @@ export class ConfirmPrompt extends Prompt<boolean> {
   constructor(options: ConfirmPromptOptions) {
     super(options);
 
-    this.message = options.message;
     this.value = options.initial;
     this.initialValue = this.value;
     this.yesMessage = options.yes || "yes";
