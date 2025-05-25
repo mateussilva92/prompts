@@ -1,17 +1,54 @@
-const $ = exports;
-const el = require("./elements");
-const noop = (v) => v;
+import {
+  AutocompletePromptOptions,
+  ConfirmPromptOptions,
+  DatePromptOptions,
+  MultiselectPromptOptions,
+  NumberPromptOptions,
+  prompts,
+  SelectPromptOptions,
+  TextPromptOptions,
+  TogglePromptOptions,
+} from "./elements";
+import { Prompt } from "./elements/prompt";
 
-function toPrompt(type, args, opts = {}) {
+type Elements = typeof prompts;
+
+// Helper to extract constructor parameters
+type ConstructorArgs<T> = T extends new (args: infer A) => any ? A : never;
+
+// Helper to extract Prompt result type
+type PromptResult<T> = T extends Prompt<infer R> ? R : never;
+
+type PromptOptions<T> = {
+  onSubmit?: (value: T) => any;
+  onAbort?: (value: T) => any;
+  onExit?: (value: T) => any;
+  onState?: (state: any) => void;
+};
+
+const noop = <T>(val: T) => val;
+
+function toPrompt<K extends keyof Elements>(
+  type: K,
+  args: ConstructorArgs<Elements[K]>,
+  options: PromptOptions<PromptResult<InstanceType<Elements[K]>>> = {},
+): Promise<PromptResult<InstanceType<Elements[K]>>> {
   return new Promise((res, rej) => {
-    const p = new el[type](args);
-    const onAbort = opts.onAbort || noop;
-    const onSubmit = opts.onSubmit || noop;
-    const onExit = opts.onExit || noop;
-    p.on("state", args.onState || noop);
-    p.on("submit", (x) => res(onSubmit(x)));
-    p.on("exit", (x) => res(onExit(x)));
-    p.on("abort", (x) => rej(onAbort(x)));
+    // cast prompts[type] to the constructor type of Elements[K]
+    const PromptClass = prompts[type] as unknown as new (
+      args: ConstructorArgs<Elements[K]>,
+    ) => InstanceType<Elements[K]>;
+    const prompt = new PromptClass(args);
+
+    const onState = options.onState ?? noop;
+    const onAbort = options.onAbort ?? noop;
+    const onSubmit = options.onSubmit ?? noop;
+    const onExit = options.onExit ?? noop;
+
+    prompt.on("state", onState);
+    prompt.on("submit", (x) => res(onSubmit(x)));
+    prompt.on("exit", (x) => res(onExit(x)));
+    prompt.on("abort", (x) => rej(onAbort(x)));
   });
 }
 
@@ -26,7 +63,7 @@ function toPrompt(type, args, opts = {}) {
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.text = (args) => toPrompt("TextPrompt", args);
+export const text = (args: TextPromptOptions) => toPrompt("TextPrompt", args);
 
 /**
  * Password prompt with masked input
@@ -38,10 +75,8 @@ $.text = (args) => toPrompt("TextPrompt", args);
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.password = (args) => {
-  args.style = "password";
-  return $.text(args);
-};
+export const password = (args: TextPromptOptions) =>
+  text({ ...args, style: "password" });
 
 /**
  * Prompt where input is invisible, like sudo
@@ -53,10 +88,8 @@ $.password = (args) => {
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.invisible = (args) => {
-  args.style = "invisible";
-  return $.text(args);
-};
+export const invisible = (args: TextPromptOptions) =>
+  text({ ...args, style: "invisible" });
 
 /**
  * Number prompt
@@ -74,7 +107,8 @@ $.invisible = (args) => {
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.number = (args) => toPrompt("NumberPrompt", args);
+export const number = (args: NumberPromptOptions) =>
+  toPrompt("NumberPrompt", args);
 
 /**
  * Date prompt
@@ -92,7 +126,7 @@ $.number = (args) => toPrompt("NumberPrompt", args);
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.date = (args) => toPrompt("DatePrompt", args);
+export const date = (args: DatePromptOptions) => toPrompt("DatePrompt", args);
 
 /**
  * Classic yes/no prompt
@@ -103,25 +137,8 @@ $.date = (args) => toPrompt("DatePrompt", args);
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.confirm = (args) => toPrompt("ConfirmPrompt", args);
-
-/**
- * List prompt, split intput string by `seperator`
- * @param {string} args.message Prompt message to display
- * @param {string} [args.initial] Default string value
- * @param {string} [args.style="default"] Render style ('default', 'password', 'invisible')
- * @param {string} [args.separator] String separator
- * @param {function} [args.onState] On state change callback
- * @param {Stream} [args.stdin] The Readable stream to listen to
- * @param {Stream} [args.stdout] The Writable stream to write readline data to
- * @returns {Promise} Promise with user input, in form of an `Array`
- */
-$.list = (args) => {
-  const sep = args.separator || ",";
-  return toPrompt("TextPrompt", args, {
-    onSubmit: (str) => str.split(sep).map((s) => s.trim()),
-  });
-};
+export const confirm = (args: ConfirmPromptOptions) =>
+  toPrompt("ConfirmPrompt", args);
 
 /**
  * Toggle/switch prompt
@@ -134,7 +151,8 @@ $.list = (args) => {
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.toggle = (args) => toPrompt("TogglePrompt", args);
+export const toggle = (args: TogglePromptOptions) =>
+  toPrompt("TogglePrompt", args);
 
 /**
  * Interactive select prompt
@@ -147,7 +165,26 @@ $.toggle = (args) => toPrompt("TogglePrompt", args);
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.select = (args) => toPrompt("SelectPrompt", args);
+export const select = (args: SelectPromptOptions) =>
+  toPrompt("SelectPrompt", args);
+
+/**
+ * List prompt, split intput string by `seperator`
+ * @param {string} args.message Prompt message to display
+ * @param {string} [args.initial] Default string value
+ * @param {string} [args.style="default"] Render style ('default', 'password', 'invisible')
+ * @param {string} [args.separator] String separator
+ * @param {function} [args.onState] On state change callback
+ * @param {Stream} [args.stdin] The Readable stream to listen to
+ * @param {Stream} [args.stdout] The Writable stream to write readline data to
+ * @returns {Promise} Promise with user input, in form of an `Array`
+ */
+export const list = (args: TextPromptOptions & { separator?: string }) => {
+  const sep = args.separator ?? ",";
+  return toPrompt("TextPrompt", args, {
+    onSubmit: (str) => str.split(sep).map((str) => str.trim()),
+  });
+};
 
 /**
  * Interactive multi-select / autocompleteMultiselect prompt
@@ -161,9 +198,9 @@ $.select = (args) => toPrompt("SelectPrompt", args);
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.multiselect = (args) => {
-  args.choices = [].concat(args.choices || []);
-  const toSelected = (items) =>
+export const multiselect = (args: MultiselectPromptOptions) => {
+  args.choices = [...(args.choices ?? [])];
+  const toSelected = (items: any[]) =>
     items.filter((item) => item.selected).map((item) => item.value);
   return toPrompt("MultiselectPrompt", args, {
     onAbort: toSelected,
@@ -171,9 +208,9 @@ $.multiselect = (args) => {
   });
 };
 
-$.autocompleteMultiselect = (args) => {
-  args.choices = [].concat(args.choices || []);
-  const toSelected = (items) =>
+export const autocompleteMultiselect = (args: MultiselectPromptOptions) => {
+  args.choices = [...(args.choices ?? [])];
+  const toSelected = (items: any[]) =>
     items.filter((item) => item.selected).map((item) => item.value);
   return toPrompt("AutocompleteMultiselectPrompt", args, {
     onAbort: toSelected,
@@ -181,14 +218,12 @@ $.autocompleteMultiselect = (args) => {
   });
 };
 
-const byTitle = (input, choices) =>
+const byTitle = (input: string, choices: any[]) =>
   Promise.resolve(
-    choices.filter(
-      (item) =>
-        item.title.slice(0, input.length).toLowerCase() === input.toLowerCase()
-    )
+    choices.filter((item) =>
+      item.title.toLowerCase().startsWith(input.toLowerCase()),
+    ),
   );
-
 /**
  * Interactive auto-complete prompt
  * @param {string} args.message Prompt message to display
@@ -204,8 +239,8 @@ const byTitle = (input, choices) =>
  * @param {Stream} [args.stdout] The Writable stream to write readline data to
  * @returns {Promise} Promise with user input
  */
-$.autocomplete = (args) => {
+export const autocomplete = (args: AutocompletePromptOptions) => {
   args.suggest = args.suggest || byTitle;
-  args.choices = [].concat(args.choices || []);
+  args.choices = [...(args.choices ?? [])];
   return toPrompt("AutocompletePrompt", args);
 };
