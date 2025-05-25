@@ -123,7 +123,6 @@ export class NumberPrompt extends Prompt<number | ""> {
     this.error = false;
     this.fire();
     this.render();
-    this.stdout.write(`\n`);
     this.close();
   }
 
@@ -151,7 +150,6 @@ export class NumberPrompt extends Prompt<number | ""> {
     this.error = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 

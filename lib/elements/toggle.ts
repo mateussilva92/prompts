@@ -43,7 +43,6 @@ export class TogglePrompt extends Prompt<boolean> {
     this.done = this.aborted = true;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 
@@ -52,7 +51,6 @@ export class TogglePrompt extends Prompt<boolean> {
     this.aborted = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 

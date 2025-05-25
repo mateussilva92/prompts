@@ -86,7 +86,7 @@ export class Prompt<T = unknown> extends EventEmitter {
 
   /** Closes the prompt, finalizing user input */
   protected close(): void {
-    this.stdout.write(cursor.show);
+    this.stdout.write("\n" + cursor.show);
     this.stdin.removeListener("keypress", this.handleKeypress);
 
     if (this.stdin.isTTY) {

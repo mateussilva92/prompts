@@ -181,7 +181,6 @@ export class AutocompletePrompt extends Prompt<any> {
       this.aborted = false;
       this.fire();
       this.render();
-      this.stdout.write("\n");
       this.close();
     }
   }
@@ -191,7 +190,6 @@ export class AutocompletePrompt extends Prompt<any> {
     this.exited = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 
@@ -200,7 +198,6 @@ export class AutocompletePrompt extends Prompt<any> {
     this.aborted = this.exited = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 

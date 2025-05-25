@@ -162,7 +162,6 @@ export class DatePrompt extends Prompt<Date> {
     this.error = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 
@@ -186,7 +185,6 @@ export class DatePrompt extends Prompt<Date> {
     this.aborted = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 

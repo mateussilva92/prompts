@@ -112,7 +112,6 @@ export class MultiselectPrompt extends Prompt<MultiselectChoice[]> {
     this.done = this.aborted = true;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 
@@ -126,7 +125,6 @@ export class MultiselectPrompt extends Prompt<MultiselectChoice[]> {
       this.aborted = false;
       this.fire();
       this.render();
-      this.stdout.write("\n");
       this.close();
     }
   }

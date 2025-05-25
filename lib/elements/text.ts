@@ -91,7 +91,6 @@ export class TextPrompt extends Prompt<string> {
     this.red = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 
@@ -121,7 +120,6 @@ export class TextPrompt extends Prompt<string> {
     this.aborted = false;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 

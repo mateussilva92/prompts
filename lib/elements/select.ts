@@ -94,7 +94,6 @@ export class SelectPrompt extends Prompt {
     this.done = this.aborted = true;
     this.fire();
     this.render();
-    this.stdout.write("\n");
     this.close();
   }
 
@@ -104,7 +103,6 @@ export class SelectPrompt extends Prompt {
       this.aborted = false;
       this.fire();
       this.render();
-      this.stdout.write("\n");
       this.close();
     } else {
       this.bell();
