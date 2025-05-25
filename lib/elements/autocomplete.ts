@@ -19,7 +19,7 @@ export type AutocompleteChoice = {
 }
 
 export type AutocompletePromptOptions = PromptOptions & {
-  choices: (string | Partial<AutocompleteChoice>)[];
+  choices: AutocompleteChoice[];
   suggest: (
     input: string,
     choices: AutocompleteChoice[],
@@ -112,7 +112,7 @@ export class AutocompletePrompt extends Prompt<any> {
     this.render();
   }
 
-  public set fallback(fb: string | number | AutocompleteChoice) {
+  public set fallback(fb: string | number | AutocompleteChoice | undefined) {
     const strFallback = String(fb);
 
     this._fb = Number.isSafeInteger(parseInt(strFallback))
