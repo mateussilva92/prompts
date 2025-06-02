@@ -125,5 +125,3 @@ export class Prompt<T = unknown> extends EventEmitter {
     if (this.firstRender) this.firstRender = false;
   }
 }
-
-module.exports = Prompt;
