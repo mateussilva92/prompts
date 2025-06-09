@@ -13,51 +13,53 @@ const ignorableProps = [
 
 type IgnoredKeys = (typeof ignorableProps)[number];
 
-type Answers = Record<string, unknown>;
+type Answers<N extends string, V extends unknown = unknown> = { [K in N]: V };
 
-type PromptType = keyof typeof prompts;
+type Prompts = typeof prompts;
 
-type PromptFunction<T extends PromptType, R> = (
+type PromptType = keyof Prompts;
+
+type Falsy = false | null | undefined;
+
+type PromptFunction<T extends PromptType, N extends string, R> = (
   prev: unknown,
-  answers: Answers,
-  question: Question<T> | DynamicQuestion<T>,
+  answers: Answers<N>,
+  question: Question<T, N> | DynamicQuestion<T, N>,
 ) => Promise<R> | R;
 
 type PromptOptionsFor<T extends PromptType> = Parameters<
-  (typeof prompts)[T]
+  Prompts[T]
 >[0];
 
-type MaybeDynamic<T extends PromptType, P> = P | PromptFunction<T, P>;
-
-type DynamicQuestion<T extends PromptType> = {
-  type: T | PromptFunction<T, PromptType>;
-  name: string;
+type BaseQuestion<T extends PromptType, N extends string> = {
+  type: T | PromptFunction<T, N, PromptType | Falsy>;
+  name: N;
   [key: string]: any; // Additional properties can be added
-} & {
+}
+
+type MaybeDynamic<T extends PromptType, N extends string, P> = P | PromptFunction<T, N, P>;
+
+type DynamicQuestion<T extends PromptType, N extends string> = BaseQuestion<T, N> & {
   [K in keyof PromptOptionsFor<T> as K extends IgnoredKeys
     ? never
-    : K]: MaybeDynamic<T, PromptOptionsFor<T>[K]>;
+    : K]: MaybeDynamic<T, N, PromptOptionsFor<T>[K]>;
 } & {
   [K in keyof PromptOptionsFor<T> as K extends IgnoredKeys
     ? K
     : never]: PromptOptionsFor<T>[K];
 };
 
-type Question<T extends PromptType> = {
-  type: T | PromptFunction<T, PromptType>;
-  name: string;
-  [key: string]: any; // Additional properties can be added
-} & PromptOptionsFor<T>;
+type Question<T extends PromptType, N extends string> = BaseQuestion<T, N> & PromptOptionsFor<T>;
 
-type PromptOptions<T extends PromptType> = {
+type PromptOptions<T extends PromptType, N extends string> = {
   onSubmit?: (
-    question: Question<T>,
+    question: Question<T, N>,
     answer: any,
-    answers: Answers,
+    answers: Answers<N>,
   ) => boolean | Promise<boolean>;
   onCancel?: (
-    question: Question<T>,
-    answers: Answers,
+    question: Question<T, N>,
+    answers: Answers<N>,
   ) => boolean | Promise<boolean>;
 };
 
@@ -68,34 +70,32 @@ type PromptOptions<T extends PromptType> = {
  * @param {Function} [onCancel] Callback function called on cancel/abort
  * @returns {Object} Object with values from user input
  */
-export const prompt: {
-  (
-    questions?: DynamicQuestion<PromptType>[] | DynamicQuestion<PromptType>, // TODO: Does it even make sense to have no questions here?
-    options?: PromptOptions<PromptType>,
-  ): Promise<Answers>;
-  _injected?: any[];
-  _override?: Record<string, any>;
-} = async function (
-  questions: DynamicQuestion<PromptType>[] | DynamicQuestion<PromptType> = [],
-  { onSubmit, onCancel }: PromptOptions<PromptType> = {},
-): Promise<Answers> {
-  const answers: Answers = {};
-  const override = prompt._override || {};
+async function prompt<N extends string = string>(
+  questions: DynamicQuestion<PromptType, N> | DynamicQuestion<PromptType, N>[],
+  { onSubmit, onCancel }: PromptOptions<PromptType, N> = {},
+): Promise<Answers<N>> {
+  const answers = {} as Answers<N>;
+
   questions = Array.isArray(questions) ? questions : [questions];
 
   let answer: unknown;
   let quit: boolean = false;
-  let question: Question<PromptType> | undefined;
+  let question: Question<PromptType, N> | undefined;
 
   for (let dynamicQuestion of questions) {
     let { name, type } = dynamicQuestion;
 
     // evaluate type first and skip if type is a falsy value
     if (typeof type === "function") {
-      type = await type(answer, { ...answers }, dynamicQuestion);
-      dynamicQuestion.type = type;
+      const evaluatedType = await type(answer, { ...answers }, dynamicQuestion);
+
+      if (!evaluatedType) {
+        continue;
+      }
+
+      type = evaluatedType as PromptType;
+      dynamicQuestion.type = type; // TODO: check this is really required
     }
-    if (!type) continue;
 
     // if property is a function, invoke it unless it's a special function
     for (const key of Object.keys(dynamicQuestion)) {
@@ -110,7 +110,7 @@ export const prompt: {
     }
 
     // Cast dynamic question to normal question
-    question = dynamicQuestion as Question<typeof type>;
+    question = dynamicQuestion as Question<typeof type, N>;
 
     // TODO: Check if this is realy required since we force it with TS.
     //       how would this work on a JS project
@@ -123,8 +123,8 @@ export const prompt: {
       throw new Error(`prompt type (${type}) is not defined`);
     }
 
-    if (override[name] !== undefined) {
-      answer = await getFormattedAnswer(answers, question, override[name]);
+    if (prompt._override[name] !== undefined) {
+      answer = await getFormattedAnswer(answers, question, prompt._override[name]);
       if (answer !== undefined) {
         answers[name] = answer;
         continue;
@@ -153,9 +153,9 @@ export const prompt: {
   return answers;
 };
 
-async function getFormattedAnswer(
-  answers: Answers,
-  question: Question<PromptType>,
+async function getFormattedAnswer<N extends string>(
+  answers: Answers<N>,
+  question: Question<PromptType, N>,
   answer: any,
   skipValidation = false,
 ): Promise<any> {
@@ -175,10 +175,17 @@ function getInjectedAnswer(injected: any[], defaultValue: any) {
   return answer === undefined ? defaultValue : answer;
 }
 
-export function inject(answers: any[]) {
-  prompt._injected = [...(prompt._injected ?? []), ...answers];
+namespace prompt {
+  export let _injected: any[] = [];
+  export let _override: Record<string, any> = {};
+
+  export function inject(answers: any[]) {
+    _injected = [..._injected, ...answers];
+  }
+
+  export function override<N extends string>(answers: Answers<N>) {
+    _override = { ...answers };
+  }
 }
 
-export function override(answers: Record<string, any>) {
-  prompt._override = { ...answers };
-}
+export { prompt };

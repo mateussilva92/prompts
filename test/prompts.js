@@ -1,15 +1,14 @@
 "use strict";
 
 const test = require("tape");
-const prompt = require("../");
-const { prompts } = prompt;
+const { prompt, prompts } = require("../dist/");
 
 test("basics", (t) => {
   t.plan(4);
   t.equal(typeof prompts, "object");
   t.equal(typeof prompt, "function");
-  t.equal(typeof prompt.prompt, "function");
   t.equal(typeof prompt.inject, "function");
+  t.equal(typeof prompt.override, "function");
 });
 
 test("prompts", (t) => {

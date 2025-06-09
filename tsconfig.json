@@ -2,7 +2,7 @@
   "compilerOptions": {
     "strict": true,
     "incremental": true,
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext"],
     "target": "ESNext",
     "module": "CommonJS",
     "moduleResolution": "node",

@@ -1,7 +1,7 @@
 "use strict";
 
 const test = require("tape");
-const { entriesToDisplay } = require("../lib/util");
+const { entriesToDisplay } = require("../dist/util");
 
 test("entriesToDisplay", (t) => {
   t.plan(11);

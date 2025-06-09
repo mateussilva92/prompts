@@ -1,4 +1,4 @@
-import * as prompts from "../index";
+import { prompt as prompts } from "../index";
 
 type HasProperty<T, K> = K extends keyof T ? true : false;
 
@@ -95,7 +95,7 @@ type HasProperty<T, K> = K extends keyof T ? true : false;
       type: "select",
       name: "subchoices",
       message: "optionception!",
-      choices: (prev) => {
+      choices: (prev: any) => {
         return [
           {
             value: prev + "A",

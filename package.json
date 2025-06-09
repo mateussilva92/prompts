@@ -19,8 +19,8 @@
   "scripts": {
     "watch": "tsc -w",
     "start": "node lib/index.js",
-    "test": "tape test/*.js | tap-spec",
-    "test-types": "tsc --noEmit test/type-declarations.ts"
+    "test": "tsc && tape test/*.js | tap-spec",
+    "test-types": "tsc --noEmit --project tsconfig.test.json"
   },
   "keywords": [
     "ui",

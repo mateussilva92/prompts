@@ -39,14 +39,14 @@ export class TextPrompt extends Prompt<string> {
   protected done: boolean = false;
   protected error: boolean = false;
 
-  constructor(options: TextPromptOptions) {
+  constructor(options?: TextPromptOptions) {
     super(options);
 
-    this.transform = render(options.style || "default");
+    this.transform = render(options?.style || "default");
     this.scale = this.transform.scale;
-    this.initial = options.initial ?? "";
-    this.validator = options.validate ?? (() => true);
-    this.errorMsg = options.error || "Please Enter A Valid Value";
+    this.initial = options?.initial ?? "";
+    this.validator = options?.validate ?? (() => true);
+    this.errorMsg = options?.error || "Please Enter A Valid Value";
     this.cursor = Number(!!this.initial);
     this.cursorOffset = 0;
     this.clear = clear("", this.stdout.columns);

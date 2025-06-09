@@ -1,7 +1,7 @@
 "use strict";
 
 const test = require("tape");
-const TextPrompt = require("../lib/elements/text");
+const { TextPrompt } = require("../dist/elements/text");
 
 test("move", (t) => {
   t.plan(6);

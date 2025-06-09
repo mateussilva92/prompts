@@ -36,14 +36,14 @@ export class Prompt<T = unknown> extends EventEmitter {
   private isSelectPrompt: boolean = false;
   private rl: readline.Interface;
 
-  constructor(options: PromptOptions) {
+  constructor(options?: PromptOptions) {
     super();
 
-    this.stdin = options.stdin ?? process.stdin;
-    this.stdout = options.stdout ?? process.stdout;
-    this.onRender = (options.onRender ?? (() => {})).bind(this);
+    this.stdin = options?.stdin ?? process.stdin;
+    this.stdout = options?.stdout ?? process.stdout;
+    this.onRender = (options?.onRender ?? (() => {})).bind(this);
 
-    this.message = options.message;
+    this.message = options?.message ?? "";
 
     this.rl = readline.createInterface({
       input: this.stdin,
